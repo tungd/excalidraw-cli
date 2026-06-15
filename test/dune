@@ -1,0 +1,3 @@
+(test
+ (name excalidraw_test)
+ (libraries excalidraw_export alcotest yojson))

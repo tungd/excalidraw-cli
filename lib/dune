@@ -1,0 +1,4 @@
+(library
+ (name excalidraw_export)
+ (public_name excalidraw-export.lib)
+ (libraries yojson tyxml))

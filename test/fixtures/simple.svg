@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg xmlns="http://www.w3.org/2000/svg"
+ xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="80 80 490 380"
+ width="490px" height="380px">
+ <defs>
+  <marker id="arrowhead" markerWidth="10px" markerHeight="7px" refX="10px"
+   refY="3.5px" orient="0deg">
+   <polygon points="0, 0 10, 3.5 0, 7" fill="none" stroke="context-stroke">
+   </polygon>
+  </marker>
+ </defs>
+ <rect x="80px" y="80px" width="490px" height="380px" fill="#ffffff"></rect>
+ <rect x="100px" y="100px" width="200px" height="120px" stroke="#1e1e1e"
+  stroke-width="4px" fill="#a5d8ff" rx="8px" ry="8px" style="opacity:1.00">
+ </rect>
+ <ellipse cx="475px" cy="195px" rx="75px" ry="75px" stroke="#2f9e44"
+  stroke-width="4px" fill="#b2f2bb" style="opacity:1.00">
+ </ellipse>
+ <polygon points="240, 300 330, 370 240, 440 150, 370" stroke="#e8590c"
+  stroke-width="4px" fill="#ffd8a8" style="opacity:1.00">
+ </polygon>
+ <g style="opacity:1.00">
+  <text x="200px" y="154px" font-family="Virgil, Hand-drawn, cursive"
+   font-size="24" stroke="none" fill="#1e1e1e" text-anchor="middle">
+   <tspan x="200px" y="154px">Hello World</tspan>
+  </text>
+ </g>
+ <path d="M300.00,160.00L400.00,160.00" stroke="#868e96" stroke-width="4px"
+  fill="none" style="opacity:1.00;marker-end:url(#arrowhead)">
+ </path>
+ <path d="M400.00,300.00L450.00,340.00L500.00,380.00" stroke="#1e1e1e"
+  stroke-width="4px" fill="none" style="opacity:1.00;stroke-dasharray:8,4">
+ </path>
+</svg>
