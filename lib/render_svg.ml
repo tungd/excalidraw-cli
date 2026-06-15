@@ -152,6 +152,20 @@ let base_of_element = function
       group_ids=[]; frame_id=None; roundness=None; seed=0; version=0;
       version_nonce=0; is_deleted=false; updated=0 }
 
+let translate_base (b : base_element) dx dy =
+  { b with x = b.x +. dx; y = b.y +. dy }
+
+let translate_element dx dy = function
+  | Rectangle el -> Rectangle { el with base = translate_base el.base dx dy }
+  | Ellipse el -> Ellipse { el with base = translate_base el.base dx dy }
+  | Diamond el -> Diamond { el with base = translate_base el.base dx dy }
+  | Text el -> Text { el with base = translate_base el.base dx dy }
+  | Line el -> Line { el with base = translate_base el.base dx dy }
+  | Arrow el -> Arrow { el with base = translate_base el.base dx dy }
+  | Image el -> Image { el with base = translate_base el.base dx dy }
+  | Frame el -> Frame { el with base = translate_base el.base dx dy }
+  | Unknown _ as el -> el
+
 let compute_bbox elements =
   let init = (max_float, max_float, min_float, min_float) in
   List.fold_left (fun (minx, miny, maxx, maxy) el ->
@@ -174,17 +188,18 @@ let render_element = function
   | Image _ | Unknown _ -> S.g []
 
 let render ?(scale=1.0) doc =
-  let padding = 20.0 in
+  let padding = 10.0 in
   let (minx, miny, maxx, maxy) =
     if doc.elements = [] then (0.0, 0.0, 400.0, 300.0)
     else compute_bbox doc.elements in
-  let vb_x = minx -. padding in
-  let vb_y = miny -. padding in
   let vb_w = (maxx -. minx) +. (2.0 *. padding) in
   let vb_h = (maxy -. miny) +. (2.0 *. padding) in
+  let offset_x = -.minx +. padding in
+  let offset_y = -.miny +. padding in
+  let elements = List.map (translate_element offset_x offset_y) doc.elements in
   let bg_color = doc.app_state.view_background_color in
   let defs =
-    if has_arrows doc.elements then [
+    if has_arrows elements then [
       S.defs ~a:[] [
         S.marker ~a:[
           S.a_id ("arrowhead");
@@ -204,14 +219,14 @@ let render ?(scale=1.0) doc =
     ] else [] in
   let bg_rect =
     S.rect ~a:[
-      S.a_x (px vb_x); S.a_y (px vb_y);
+      S.a_x (px 0.); S.a_y (px 0.);
       S.a_width (px vb_w); S.a_height (px vb_h);
       S.a_fill (`Color (bg_color, None));
     ] [] in
-  let children = defs @ [ bg_rect ] @ List.map render_element doc.elements in
+  let children = defs @ [ bg_rect ] @ List.map render_element elements in
   let svg_doc =
     S.svg ~a:[
-      S.a_viewBox (vb_x, vb_y, vb_w, vb_h);
+      S.a_viewBox (0., 0., vb_w, vb_h);
       S.a_width (px (vb_w *. scale));
       S.a_height (px (vb_h *. scale));
     ] children in
