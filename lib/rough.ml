@@ -37,7 +37,7 @@ type options = {
   curveTightness : float;
 }
 
-let default_options ~seed ~roughness ~stroke_width =
+let default_options ~seed ~roughness ~stroke_width ?(disable_multi_stroke=false) () =
   let rng = make_rng seed in
   {
     rng;
@@ -49,7 +49,7 @@ let default_options ~seed ~roughness ~stroke_width =
     hachureGap = stroke_width *. 4.0;
     hachureAngle = -41.0;
     fillStyle = "hachure";
-    disableMultiStroke = false;
+    disableMultiStroke = disable_multi_stroke;
     disableMultiStrokeFill = false;
     preserveVertices = false;
     curveStepCount = 9;
@@ -287,8 +287,9 @@ let cross_hatch_fill polygon_list o =
 
 (* --- Public API: shape generators returning (stroke_path, fill_path) --- *)
 
-let rectangle ~seed ~roughness ~stroke_width ~width ~height ?(fill_style="hachure") () =
-  let o = default_options ~seed ~roughness:(float roughness) ~stroke_width in
+let rectangle ~seed ~roughness ~stroke_width ~width ~height ?(fill_style="hachure") ?(stroke_style="solid") () =
+  let disable_ms = stroke_style <> "solid" in
+  let o = default_options ~seed ~roughness:(float roughness) ~stroke_width ~disable_multi_stroke:disable_ms () in
   let stroke_opsets = rectangle_ops 0.0 0.0 width height o in
   let polygon = [(0.0, 0.0); (width, 0.0); (width, height); (0.0, height)] in
   let fill_d =
@@ -302,8 +303,9 @@ let rectangle ~seed ~roughness ~stroke_width ~width ~height ?(fill_style="hachur
   let stroke_d = String.concat " " (List.map opset_to_path stroke_opsets) in
   (stroke_d, fill_d)
 
-let ellipse ~seed ~roughness ~stroke_width ~width ~height ?(fill_style="hachure") () =
-  let o = default_options ~seed ~roughness:(float roughness) ~stroke_width in
+let ellipse ~seed ~roughness ~stroke_width ~width ~height ?(fill_style="hachure") ?(stroke_style="solid") () =
+  let disable_ms = stroke_style <> "solid" in
+  let o = default_options ~seed ~roughness:(float roughness) ~stroke_width ~disable_multi_stroke:disable_ms () in
   let cx = width /. 2.0 in
   let cy = height /. 2.0 in
   let stroke_opsets = ellipse_ops cx cy width height o in
@@ -325,8 +327,9 @@ let ellipse ~seed ~roughness ~stroke_width ~width ~height ?(fill_style="hachure"
   let stroke_d = String.concat " " (List.map opset_to_path stroke_opsets) in
   (stroke_d, fill_d)
 
-let diamond ~seed ~roughness ~stroke_width ~width ~height ?(fill_style="hachure") () =
-  let o = default_options ~seed ~roughness:(float roughness) ~stroke_width in
+let diamond ~seed ~roughness ~stroke_width ~width ~height ?(fill_style="hachure") ?(stroke_style="solid") () =
+  let disable_ms = stroke_style <> "solid" in
+  let o = default_options ~seed ~roughness:(float roughness) ~stroke_width ~disable_multi_stroke:disable_ms () in
   let cx = width /. 2.0 in
   let cy = height /. 2.0 in
   let stroke_opsets = diamond_ops 0.0 0.0 width height o in
@@ -358,7 +361,7 @@ let line_ops points o =
   [{ typ = "path"; ops = !ops }]
 
 let line ~seed ~roughness ~stroke_width ~points =
-  let o = default_options ~seed ~roughness:(float roughness) ~stroke_width in
+  let o = default_options ~seed ~roughness:(float roughness) ~stroke_width () in
   let stroke_opsets = line_ops points o in
   let stroke_d = String.concat " " (List.map opset_to_path stroke_opsets) in
   stroke_d
@@ -380,6 +383,6 @@ let arrowhead_ops x1 y1 x2 y2 o =
   [{ typ = "path"; ops = ops1 }; { typ = "path"; ops = ops2 }]
 
 let arrowhead ~seed ~roughness ~stroke_width ~x1 ~y1 ~x2 ~y2 =
-  let o = default_options ~seed ~roughness:(float roughness) ~stroke_width in
+  let o = default_options ~seed ~roughness:(float roughness) ~stroke_width () in
   let opsets = arrowhead_ops x1 y1 x2 y2 o in
   List.map opset_to_path opsets
