@@ -3,3 +3,19 @@
  (public_name excalidraw-cli.server)
  (libraries cohttp-eio eio eio_main yojson excalidraw_cli)
  (modules server editor_static))
+
+(rule
+ (mode fallback)
+ (target editor_static.ml)
+ (deps (source_tree ../excalidraw-editor/src)
+       (file ../excalidraw-editor/index.html)
+       (file ../excalidraw-editor/package.json)
+       (file ../excalidraw-editor/pnpm-lock.yaml)
+       (file ../excalidraw-editor/vite.config.js))
+ (action
+  (with-stdout-to %{target}
+   (run bash -c "set -e
+cd ../../../excalidraw-editor
+./node_modules/.bin/vite build >&2
+exec ocaml-crunch -m plain dist"
+   "bash"))))
