@@ -204,7 +204,7 @@ let compute_bbox elements =
 let render_element_raw = function
   | Rectangle el ->
     let fill_style = match el.base.fill_style with Solid -> "solid" | Hachure -> "hachure" | Cross_hatch -> "cross-hatch" in
-    let (stroke_d, fill_d) = Rough.rectangle ~fill_style ~stroke_style:(match el.base.stroke_style with Solid -> "solid" | Dashed -> "dashed" | Dotted -> "dotted") ~seed:el.base.seed ~roughness:el.base.roughness ~stroke_width:el.base.raw_stroke_width ~width:el.base.width ~height:el.base.height () in
+    let (stroke_d, fill_d) = Rough.rectangle ~fill_style ~stroke_style:(match el.base.stroke_style with Solid -> "solid" | Dashed -> "dashed" | Dotted -> "dotted") ~roundness:(match el.base.roundness with Some r -> (match r.value with Some v -> v | None -> 0.0) | None -> 0.0) ~seed:el.base.seed ~roughness:el.base.roughness ~stroke_width:el.base.raw_stroke_width ~width:el.base.width ~height:el.base.height () in
     let b = el.base in
     let style = if b.opacity <> 100 then
       [Printf.sprintf "opacity:%.2f" (float_of_int b.opacity /. 100.0)]

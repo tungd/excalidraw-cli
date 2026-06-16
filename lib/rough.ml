@@ -136,21 +136,91 @@ let _double_line x1 y1 x2 y2 o =
 
 (* --- Rectangle --- *)
 
-let rectangle_ops x y width height o =
-  let points = [
-    (x, y);
-    (x +. width, y);
-    (x +. width, y +. height);
-    (x, y +. height);
-  ] in
-  let ops = ref [] in
-  let pts = points @ [List.hd points] in
-  for i = 0 to List.length points - 1 do
-    let (x1, y1) = List.nth pts i in
-    let (x2, y2) = List.nth pts (i + 1) in
-    ops := !ops @ _double_line x1 y1 x2 y2 o
-  done;
-  [{ typ = "path"; ops = !ops }]
+let rectangle_ops x y width height o roundness =
+  let r = min roundness (min width height /. 2.0) in  (* cap at half the smaller side *)
+  if r <= 0.0 then begin
+    (* Sharp rectangle *)
+    let points = [
+      (x, y);
+      (x +. width, y);
+      (x +. width, y +. height);
+      (x, y +. height);
+    ] in
+    let ops = ref [] in
+    let pts = points @ [List.hd points] in
+    for i = 0 to List.length points - 1 do
+      let (x1, y1) = List.nth pts i in
+      let (x2, y2) = List.nth pts (i + 1) in
+      ops := !ops @ _double_line x1 y1 x2 y2 o
+    done;
+    [{ typ = "path"; ops = !ops }]
+  end else begin
+    (* Rounded rectangle: generate points along the rounded contour *)
+    let segs_per_corner = 3 in  (* segments per quarter circle *)
+    let arc_step = (Float.pi /. 2.0) /. float_of_int segs_per_corner in
+    let pts = ref [] in
+    (* Top edge *)
+    pts := (x +. r, y) :: !pts;
+    pts := (x +. width -. r, y) :: !pts;
+    (* Top-right corner arc *)
+    let cx = x +. width -. r in
+    let cy = y +. r in
+    for i = 1 to segs_per_corner do
+      let a = float_of_int i *. arc_step in
+      let px = cx +. r *. cos a in
+      let py = cy +. r *. (-. sin a) in
+      pts := (px, py) :: !pts
+    done;
+    (* Right edge *)
+    pts := (x +. width, y +. r) :: !pts;
+    pts := (x +. width, y +. height -. r) :: !pts;
+    (* Bottom-right corner arc *)
+    let cx = x +. width -. r in
+    let cy = y +. height -. r in
+    for i = 1 to segs_per_corner do
+      let a = float_of_int i *. arc_step in
+      let px = cx +. r *. (-. sin a) in
+      let py = cy +. r *. (-. cos a) in
+      pts := (px, py) :: !pts
+    done;
+    (* Bottom edge *)
+    pts := (x +. width -. r, y +. height) :: !pts;
+    pts := (x +. r, y +. height) :: !pts;
+    (* Bottom-left corner arc *)
+    let cx = x +. r in
+    let cy = y +. height -. r in
+    for i = 1 to segs_per_corner do
+      let a = float_of_int i *. arc_step in
+      let px = cx +. r *. (-. cos a) in
+      let py = cy +. r *. sin a in
+      pts := (px, py) :: !pts
+    done;
+    (* Left edge *)
+    pts := (x, y +. height -. r) :: !pts;
+    pts := (x, y +. r) :: !pts;
+    (* Top-left corner arc (closing the path) *)
+    let cx = x +. r in
+    let cy = y +. r in
+    for i = 1 to segs_per_corner do
+      let a = float_of_int i *. arc_step in
+      let px = cx +. r *. sin a in
+      let py = cy +. r *. (-. cos a) in
+      pts := (px, py) :: !pts
+    done;
+    let pts = List.rev !pts in
+    let ops = ref [] in
+    let n = List.length pts in
+    for i = 0 to n - 2 do
+      let (x1, y1) = List.nth pts i in
+      let (x2, y2) = List.nth pts (i + 1) in
+      ops := !ops @ _double_line x1 y1 x2 y2 o
+    done;
+    (* Close the path (last point back to first) *)
+    let (x1, y1) = List.nth pts (n - 1) in
+    let (x2, y2) = List.nth pts 0 in
+    ops := !ops @ _double_line x1 y1 x2 y2 o;
+    [{ typ = "path"; ops = !ops }]
+  end
 
 (* --- Ellipse --- *)
 
@@ -287,10 +357,10 @@ let cross_hatch_fill polygon_list o =
 
 (* --- Public API: shape generators returning (stroke_path, fill_path) --- *)
 
-let rectangle ~seed ~roughness ~stroke_width ~width ~height ?(fill_style="hachure") ?(stroke_style="solid") () =
+let rectangle ~seed ~roughness ~stroke_width ~width ~height ?(fill_style="hachure") ?(stroke_style="solid") ?(roundness=0.0) () =
   let disable_ms = stroke_style <> "solid" in
   let o = default_options ~seed ~roughness:(float roughness) ~stroke_width ~disable_multi_stroke:disable_ms () in
-  let stroke_opsets = rectangle_ops 0.0 0.0 width height o in
+  let stroke_opsets = rectangle_ops 0.0 0.0 width height o roundness in
   let polygon = [(0.0, 0.0); (width, 0.0); (width, height); (0.0, height)] in
   let fill_d =
     match fill_style with
