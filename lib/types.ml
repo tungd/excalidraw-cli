@@ -26,6 +26,7 @@ type base_element = {
   background_color : string;
   fill_style : fill_style;
   stroke_width : stroke_width;
+  raw_stroke_width : float;  (** Raw strokeWidth from JSON, used by rough.js *)
   stroke_style : stroke_style;
   roughness : int;
   opacity : int;

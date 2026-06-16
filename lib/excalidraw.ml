@@ -49,6 +49,10 @@ let parse_base json =
       | Some "hachure" -> Hachure | Some "cross-hatch" -> Cross_hatch | _ -> Solid);
     stroke_width = (match Yojson.Safe.Util.member "strokeWidth" json with
       | `Int 2 -> Bold | `Int 3 -> Extra_bold | _ -> Normal);
+    raw_stroke_width = (match Yojson.Safe.Util.member "strokeWidth" json with
+      | `Int i -> float_of_int i
+      | `Float f -> f
+      | _ -> 1.0);
     stroke_style = (match get_string json "strokeStyle" with
       | Some "dashed" -> Dashed | Some "dotted" -> Dotted | _ -> Solid);
     roughness = (match Yojson.Safe.Util.member "roughness" json with

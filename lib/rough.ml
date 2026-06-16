@@ -28,6 +28,7 @@ type options = {
   strokeWidth : float;
   fillWeight : float;
   hachureGap : float;
+  hachureAngle : float;
   fillStyle : string;
   disableMultiStroke : bool;
   disableMultiStrokeFill : bool;
@@ -46,6 +47,7 @@ let default_options ~seed ~roughness ~stroke_width =
     strokeWidth = stroke_width;
     fillWeight = stroke_width /. 2.0;
     hachureGap = stroke_width *. 4.0;
+    hachureAngle = -41.0;
     fillStyle = "hachure";
     disableMultiStroke = false;
     disableMultiStrokeFill = false;
@@ -194,10 +196,22 @@ let diamond_ops x y width height o =
 
 (* --- Hachure fill matching rough.js hachure filler --- *)
 
+let rotate_points points angle =
+  let cos_a = cos angle in
+  let sin_a = sin angle in
+  List.map (fun (x, y) ->
+    (x *. cos_a -. y *. sin_a,
+     x *. sin_a +. y *. cos_a)
+  ) points
+
 let hachure_fill polygon_list o =
   let gap = o.hachureGap in
   if gap <= 0.0 then []
   else begin
+    (* Convert hachure angle to radians *)
+    let angle_rad = o.hachureAngle *. Float.pi /. 180.0 in
+    (* Rotate all polygons by the hachure angle *)
+    let rotated_polygons = List.map (fun polygon -> rotate_points polygon angle_rad) polygon_list in
     let min_y = ref max_float in
     let max_y = ref min_float in
     List.iter (fun polygon ->
@@ -207,7 +221,7 @@ let hachure_fill polygon_list o =
           max_y := max !max_y y
         end
       ) polygon
-    ) polygon_list;
+    ) rotated_polygons;
     let ops = ref [] in
     let y = ref (!min_y +. gap) in
     while !y < !max_y do
@@ -223,11 +237,19 @@ let hachure_fill polygon_list o =
             intersections := ix :: !intersections
           end
         done
-      ) polygon_list;
+      ) rotated_polygons;
       let intersections = List.sort compare !intersections in
       let rec draw_pairs = function
         | x1 :: x2 :: rest ->
-          let line_ops = _double_line x1 !y x2 !y o in
+          (* Draw the line in rotated space, then rotate back *)
+          let cos_a = cos (-. angle_rad) in
+          let sin_a = sin (-. angle_rad) in
+          let y_f = !y in
+          let rx1 = x1 *. cos_a -. y_f *. sin_a in
+          let ry1 = x1 *. sin_a +. y_f *. cos_a in
+          let rx2 = x2 *. cos_a -. y_f *. sin_a in
+          let ry2 = x2 *. sin_a +. y_f *. cos_a in
+          let line_ops = _double_line rx1 ry1 rx2 ry2 o in
           ops := !ops @ line_ops;
           draw_pairs rest
         | _ -> ()
@@ -258,8 +280,8 @@ let opset_to_path os = ops_to_path os.ops
 
 (* --- Public API: shape generators returning (stroke_path, fill_path) --- *)
 
-let rectangle ~seed ~roughness ~width ~height =
-  let o = default_options ~seed ~roughness:(float roughness) ~stroke_width:1.0 in
+let rectangle ~seed ~roughness ~stroke_width ~width ~height =
+  let o = default_options ~seed ~roughness:(float roughness) ~stroke_width in
   let stroke_opsets = rectangle_ops 0.0 0.0 width height o in
   let polygon = [(0.0, 0.0); (width, 0.0); (width, height); (0.0, height)] in
   let fill_opsets = hachure_fill [polygon] o in
@@ -267,8 +289,8 @@ let rectangle ~seed ~roughness ~width ~height =
   let fill_d = String.concat " " (List.map opset_to_path fill_opsets) in
   (stroke_d, fill_d)
 
-let ellipse ~seed ~roughness ~width ~height =
-  let o = default_options ~seed ~roughness:(float roughness) ~stroke_width:1.0 in
+let ellipse ~seed ~roughness ~stroke_width ~width ~height =
+  let o = default_options ~seed ~roughness:(float roughness) ~stroke_width in
   let cx = width /. 2.0 in
   let cy = height /. 2.0 in
   let stroke_opsets = ellipse_ops cx cy width height o in
@@ -284,8 +306,8 @@ let ellipse ~seed ~roughness ~width ~height =
   let fill_d = String.concat " " (List.map opset_to_path fill_opsets) in
   (stroke_d, fill_d)
 
-let diamond ~seed ~roughness ~width ~height =
-  let o = default_options ~seed ~roughness:(float roughness) ~stroke_width:1.0 in
+let diamond ~seed ~roughness ~stroke_width ~width ~height =
+  let o = default_options ~seed ~roughness:(float roughness) ~stroke_width in
   let cx = width /. 2.0 in
   let cy = height /. 2.0 in
   let stroke_opsets = diamond_ops 0.0 0.0 width height o in

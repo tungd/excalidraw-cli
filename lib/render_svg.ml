@@ -8,11 +8,6 @@ let fill_color_of b =
   if b.background_color = "" || b.background_color = "transparent"
   then `None else `Color (b.background_color, None)
 
-let sw_of = function
-  | Normal -> 2.0
-  | Bold -> 4.0
-  | Extra_bold -> 6.0
-
 let opacity_style b =
   Printf.sprintf "opacity:%.2f" (float_of_int b.opacity /. 100.0)
 
@@ -41,7 +36,7 @@ let rough_transform (b : base_element) =
 let path_attr b d = [
   S.a_d d;
   S.a_stroke (stroke_paint b);
-  S.a_stroke_width (px (sw_of b.stroke_width));
+  S.a_stroke_width (px b.raw_stroke_width);
   S.a_fill `None;
   S.a_stroke_linecap `Round;
 ]
@@ -49,7 +44,7 @@ let path_attr b d = [
 let fill_path_attr b d = [
   S.a_d d;
   S.a_stroke (fill_color_of b);
-  S.a_stroke_width (px 0.5);
+  S.a_stroke_width (px (b.raw_stroke_width /. 2.0));
   S.a_fill `None;
   S.a_stroke_linecap `Round;
 ]
@@ -57,21 +52,21 @@ let fill_path_attr b d = [
 (* --- Element renderers --- *)
 let render_rectangle (el : rectangle_element) =
   let b = el.base in
-  let stroke_d, fill_d = Rough.rectangle ~seed:b.seed ~roughness:b.roughness ~width:b.width ~height:b.height in
+  let stroke_d, fill_d = Rough.rectangle ~seed:b.seed ~roughness:b.roughness ~stroke_width:b.raw_stroke_width ~width:b.width ~height:b.height in
   let fill_path = S.path ~a:(fill_path_attr b fill_d) [] in
   let stroke_path = S.path ~a:(path_attr b stroke_d) [] in
   S.g ~a:(rough_transform b @ style_attr b) [ fill_path; stroke_path ]
 
 let render_ellipse (el : ellipse_element) =
   let b = el.base in
-  let stroke_d, fill_d = Rough.ellipse ~seed:b.seed ~roughness:b.roughness ~width:b.width ~height:b.height in
+  let stroke_d, fill_d = Rough.ellipse ~seed:b.seed ~roughness:b.roughness ~stroke_width:b.raw_stroke_width ~width:b.width ~height:b.height in
   let fill_path = S.path ~a:(fill_path_attr b fill_d) [] in
   let stroke_path = S.path ~a:(path_attr b stroke_d) [] in
   S.g ~a:(rough_transform b @ style_attr b) [ fill_path; stroke_path ]
 
 let render_diamond (el : diamond_element) =
   let b = el.base in
-  let stroke_d, fill_d = Rough.diamond ~seed:b.seed ~roughness:b.roughness ~width:b.width ~height:b.height in
+  let stroke_d, fill_d = Rough.diamond ~seed:b.seed ~roughness:b.roughness ~stroke_width:b.raw_stroke_width ~width:b.width ~height:b.height in
   let fill_path = S.path ~a:(fill_path_attr b fill_d) [] in
   let stroke_path = S.path ~a:(path_attr b stroke_d) [] in
   S.g ~a:(rough_transform b @ style_attr b) [ fill_path; stroke_path ]
@@ -120,7 +115,7 @@ let render_linear ~is_arrow (el : linear_element) =
   let s = String.concat ";" (List.filter (fun x -> x <> "") style_parts) in
   S.path ~a:([
     S.a_d (d_str); S.a_stroke (stroke_paint b);
-    S.a_stroke_width (px (sw_of b.stroke_width)); S.a_fill `None;
+    S.a_stroke_width (px b.raw_stroke_width); S.a_fill `None;
   ] @ [ S.a_style s ] @ transform_attr b) []
 
 let render_frame (el : frame_element) =
@@ -140,7 +135,7 @@ let base_of_element = function
   | Unknown _ ->
     { id=""; x=0.; y=0.; width=0.; height=0.; angle=0.;
       stroke_color=""; background_color=""; fill_style=Solid;
-      stroke_width=Normal; stroke_style=Solid; roughness=0; opacity=100;
+      stroke_width=Normal; raw_stroke_width=1.0; stroke_style=Solid; roughness=0; opacity=100;
       group_ids=[]; frame_id=None; roundness=None; seed=0; version=0;
       version_nonce=0; is_deleted=false; updated=0 }
 
