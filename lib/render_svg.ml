@@ -49,13 +49,12 @@ let rough_transform (b : base_element) =
   Printf.sprintf "translate(%.0f %.0f) rotate(0 %.0f %.0f)"
     b.x b.y (b.width /. 2.0) (b.height /. 2.0)
 
-let rough_path_attrs stroke_color w d b =
+let rough_path_attrs~stroke_color ~w ~d ~b =
   let parts = [
     attr "d" d;
     attr "stroke" stroke_color;
     float_attr "stroke-width" w;
     attr "fill" "none";
-    attr "stroke-linecap" "round";
   ] @ (dash_attr b) in
   String.concat " " parts
 
@@ -104,6 +103,10 @@ let render_text_raw (el : text_element) =
     let cy = b.y +. (b.height /. 2.0) in
     Printf.sprintf " transform=\"rotate(%.4g %.4g %.4g)\"" b.angle cx cy
   else "" in
+  let text_style =
+    if b.opacity <> 100 then
+      [attr "style" (Printf.sprintf "opacity:%.2f" (float_of_int b.opacity /. 100.0))]
+    else [] in
   let attrs = [
     float_attr "x" text_x;
     float_attr "y" baseline_y;
@@ -112,8 +115,7 @@ let render_text_raw (el : text_element) =
     attr "stroke" "none";
     attr "fill" b.stroke_color;
     attr "text-anchor" anchor;
-    attr "style" (Printf.sprintf "opacity:%.2f" (float_of_int b.opacity /. 100.0));
-  ] @ (if transform <> "" then [transform] else []) in
+  ] @ text_style @ (if transform <> "" then [transform] else []) in
   mk "text" ~children:(List.map (fun t -> t) tspans) attrs
 
 (* --- Linear (line/arrow) element --- *)
@@ -125,7 +127,7 @@ let rough_linear_svg (b : base_element) stroke_paths =
   let transform = Printf.sprintf "translate(%.0f %.0f) rotate(0 %.0f %.0f)"
     b.x b.y (b.width /. 2.0) (b.height /. 2.0) in
   let path_els = List.map (fun d ->
-    void_el "path" [rough_path_attrs b.stroke_color b.raw_stroke_width d b]
+    void_el "path" [rough_path_attrs ~stroke_color:b.stroke_color ~w:b.raw_stroke_width ~d:d ~b]
   ) stroke_paths in
   let all_attrs = [
     attr "stroke-linecap" "round";
@@ -243,7 +245,7 @@ let render_element_raw = function
       attr "stroke-linecap" "round";
       Printf.sprintf "transform=\"%s\"" (rough_transform b);
     ] @ (match style with [] -> [] | _ -> [Printf.sprintf " style=\"%s\"" (String.concat ";" style)]) in
-    let stroke_path = void_el "path" [rough_path_attrs b.stroke_color b.raw_stroke_width stroke_d b] in
+    let stroke_path = void_el "path" [rough_path_attrs ~stroke_color:b.stroke_color ~w:b.raw_stroke_width ~d:stroke_d ~b] in
     if fill_style = "solid" && fill_color b <> "none" then begin
       let fill_shape = void_el "rect" [
         float_attr "x" 0.; float_attr "y" 0.;
@@ -252,7 +254,7 @@ let render_element_raw = function
       ] in
       mk "g" ~children:[fill_shape; stroke_path] attrs
     end else if fill_d <> "" then begin
-      let fill_path = void_el "path" [rough_path_attrs (fill_color b) (b.raw_stroke_width /. 2.0) fill_d b] in
+      let fill_path = void_el "path" [rough_path_attrs ~stroke_color:(fill_color b) ~w:(b.raw_stroke_width /. 2.0) ~d:fill_d ~b] in
       mk "g" ~children:[fill_path; stroke_path] attrs
     end else
       mk "g" ~children:[stroke_path] attrs
@@ -267,7 +269,7 @@ let render_element_raw = function
       attr "stroke-linecap" "round";
       Printf.sprintf "transform=\"%s\"" (rough_transform b);
     ] @ (match style with [] -> [] | _ -> [Printf.sprintf " style=\"%s\"" (String.concat ";" style)]) in
-    let stroke_path = void_el "path" [rough_path_attrs b.stroke_color b.raw_stroke_width stroke_d b] in
+    let stroke_path = void_el "path" [rough_path_attrs ~stroke_color:b.stroke_color ~w:b.raw_stroke_width ~d:stroke_d ~b] in
     if fill_style = "solid" && fill_color b <> "none" then begin
       let fill_shape = void_el "ellipse" [
         float_attr "cx" (b.width /. 2.); float_attr "cy" (b.height /. 2.);
@@ -276,7 +278,7 @@ let render_element_raw = function
       ] in
       mk "g" ~children:[fill_shape; stroke_path] attrs
     end else if fill_d <> "" then begin
-      let fill_path = void_el "path" [rough_path_attrs (fill_color b) (b.raw_stroke_width /. 2.0) fill_d b] in
+      let fill_path = void_el "path" [rough_path_attrs ~stroke_color:(fill_color b) ~w:(b.raw_stroke_width /. 2.0) ~d:fill_d ~b] in
       mk "g" ~children:[fill_path; stroke_path] attrs
     end else
       mk "g" ~children:[stroke_path] attrs
@@ -291,7 +293,7 @@ let render_element_raw = function
       attr "stroke-linecap" "round";
       Printf.sprintf "transform=\"%s\"" (rough_transform b);
     ] @ (match style with [] -> [] | _ -> [Printf.sprintf " style=\"%s\"" (String.concat ";" style)]) in
-    let stroke_path = void_el "path" [rough_path_attrs b.stroke_color b.raw_stroke_width stroke_d b] in
+    let stroke_path = void_el "path" [rough_path_attrs ~stroke_color:b.stroke_color ~w:b.raw_stroke_width ~d:stroke_d ~b] in
     if fill_style = "solid" && fill_color b <> "none" then begin
       let cx = b.width /. 2. in
       let cy = b.height /. 2. in
@@ -302,7 +304,7 @@ let render_element_raw = function
       ] in
       mk "g" ~children:[fill_shape; stroke_path] attrs
     end else if fill_d <> "" then begin
-      let fill_path = void_el "path" [rough_path_attrs (fill_color b) (b.raw_stroke_width /. 2.0) fill_d b] in
+      let fill_path = void_el "path" [rough_path_attrs ~stroke_color:(fill_color b) ~w:(b.raw_stroke_width /. 2.0) ~d:fill_d ~b] in
       mk "g" ~children:[fill_path; stroke_path] attrs
     end else
       mk "g" ~children:[stroke_path] attrs
@@ -330,6 +332,7 @@ let render ?(scale=1.0) doc =
   pf "<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\"";
   pf " viewBox=\"0 0 %.15g %.15g\"" vb_w vb_h;
   pf " width=\"%.15g\" height=\"%.15g\">" (vb_w *. scale) (vb_h *. scale);
+  pf "<!-- svg-source:excalidraw --><metadata></metadata><defs><style class=\"style-fonts\">\n      </style></defs>";
   (* Background *)
   pf "<rect x=\"0\" y=\"0\" width=\"%.15g\" height=\"%.15g\" fill=\"%s\"></rect>" (vb_w *. scale) (vb_h *. scale) bg_color;
   (* Elements *)
