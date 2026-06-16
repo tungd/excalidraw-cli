@@ -5,7 +5,7 @@ let version = "0.2.0"
 (* --- Export subcommand --- *)
 
 let parse_input path =
-  try Excalidraw_export.Excalidraw.parse_file path
+  try Excalidraw_cli.Excalidraw.parse_file path
   with
   | Sys_error msg ->
     begin
@@ -20,7 +20,7 @@ let parse_input path =
 
 let run_export input_file output_file scale =
   let doc = parse_input input_file in
-  let svg = Excalidraw_export.Render_svg.render ~scale doc in
+  let svg = Excalidraw_cli.Render_svg.render ~scale doc in
   let out_path = match output_file with
     | Some p -> p
     | None ->
@@ -56,7 +56,7 @@ let run_serve input_file output_file theme port no_open =
   begin
     if not (Sys.file_exists input_file) then begin
       let oc = open_out input_file in
-      output_string oc {|{"type":"excalidraw","version":2,"source":"excalidraw-export","elements":[],"appState":{"viewBackgroundColor":"#ffffff"}}|};
+      output_string oc {|{"type":"excalidraw","version":2,"source":"excalidraw-cli","elements":[],"appState":{"viewBackgroundColor":"#ffffff"}}|};
       close_out oc;
       Printf.printf "Created %s\n%!" input_file
     end;
@@ -103,7 +103,7 @@ let serve_cmd =
 
 let cmd =
   let doc = "Export and edit Excalidraw files" in
-  let info = Cmd.info "excalidraw-export" ~version ~doc in
+  let info = Cmd.info "excalidraw-cli" ~version ~doc in
   Cmd.group info [ export_cmd; serve_cmd ]
 
 let () = exit (Cmd.eval cmd)

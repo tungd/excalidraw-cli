@@ -55,7 +55,7 @@ function App() {
       const payload = {
         type: "excalidraw",
         version: 2,
-        source: "excalidraw-export",
+        source: "excalidraw-cli",
         elements: elements,
         appState: {
           viewBackgroundColor: appState.viewBackgroundColor,
@@ -87,7 +87,7 @@ function App() {
     const payload = {
       type: "excalidraw",
       version: 2,
-      source: "excalidraw-export",
+      source: "excalidraw-cli",
       elements: elements,
       appState: {
         viewBackgroundColor: appState.viewBackgroundColor,

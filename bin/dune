@@ -1,4 +1,4 @@
 (executable
  (name main)
- (public_name excalidraw-export)
- (libraries excalidraw_export excalidraw_server cmdliner eio eio_main))
+ (public_name excalidraw-cli)
+ (libraries excalidraw_cli excalidraw_server cmdliner eio eio_main))

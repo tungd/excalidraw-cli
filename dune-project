@@ -1,8 +1,8 @@
 (lang dune 3.14)
-(name excalidraw-export)
+(name excalidraw-cli)
 (generate_opam_files true)
 (package
- (name excalidraw-export)
+ (name excalidraw-cli)
  (synopsis "CLI tool to export Excalidraw files to SVG and edit them visually")
  (depends
   (ocaml (>= 5.1))

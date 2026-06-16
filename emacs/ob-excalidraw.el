@@ -5,7 +5,7 @@
 ;; Author: Excalidraw Export Contributors
 ;; Keywords: literate programming, reproducible research, drawing
 ;; Package-Requires: ((emacs "29.1"))
-;; URL: https://github.com/tungd/excalidraw-export
+;; URL: https://github.com/tungd/excalidraw-cli
 
 ;;; Commentary:
 
@@ -35,7 +35,7 @@
 ;;   :file    - Output file path (SVG). Required.
 ;;   :scale   - Output scale factor (default 1.0)
 ;;
-;; Requires `excalidraw-export' to be on your PATH.
+;; Requires `excalidraw-cli' to be on your PATH.
 
 ;;; Code:
 
@@ -48,13 +48,13 @@
   :group 'org-babel
   :prefix "ob-excalidraw-")
 
-(defcustom ob-excalidraw-export-executable "excalidraw-export"
-  "Path to the excalidraw-export executable."
+(defcustom ob-excalidraw-export-executable "excalidraw-cli"
+  "Path to the excalidraw-cli executable."
   :type 'string
   :group 'ob-excalidraw)
 
 (defcustom ob-excalidraw-serve-executable nil
-  "Path to the excalidraw-export executable for serve mode.
+  "Path to the excalidraw-cli executable for serve mode.
 Falls back to `ob-excalidraw-export-executable' when nil."
   :type '(choice (const nil) string)
   :group 'ob-excalidraw)
@@ -107,11 +107,11 @@ PARAMS is a property list of source block parameters."
                       (shell-quote-argument in-file)
                       (shell-quote-argument out-file)
                       scale-arg)))
-    (message "excalidraw-export: rendering %s" out-file)
+    (message "excalidraw-cli: rendering %s" out-file)
     (let ((exit-code (org-babel-eval cmd "")))
       (delete-file in-file)
       (when (and exit-code (not (zerop exit-code)))
-        (error "excalidraw-export failed with exit code %d" exit-code)))
+        (error "excalidraw-cli failed with exit code %d" exit-code)))
     nil))
 
 (defun org-babel-prep-session:excalidraw (_session _params)

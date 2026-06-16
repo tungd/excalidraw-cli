@@ -1,4 +1,4 @@
 (library
- (name excalidraw_export)
- (public_name excalidraw-export.lib)
+ (name excalidraw_cli)
+ (public_name excalidraw-cli.lib)
  (libraries yojson tyxml))
