@@ -62,8 +62,24 @@ let rough_path_attrs stroke_color w d b =
 
 (* --- Text element --- *)
 
+(* Font metrics used by Excalidraw for each font family.
+   The ratios are derived from actual canvas measurements.
+   baseline_ratio: y-position of the alphabetic baseline from the top of the line box,
+     expressed as a fraction of fontSize.
+     For most fonts this is ~0.88-0.9. For Virgil (handwriting) it's ~0.881.
+   height_ratio: the actual visual line height divided by the theoretical
+     lineHeight * fontSize. For standard fonts this is 1.0.
+     For Virgil it's ~1.0145 because the font extends slightly beyond the metrics. *)
+
+type font_metrics = { baseline_ratio : float; height_ratio : float }
+
+let font_metrics_of = function
+  | 1 -> { baseline_ratio = 0.881; height_ratio = 1.014525 }
+  | _ -> { baseline_ratio = 0.9;  height_ratio = 1.0 }
+
 let render_text_raw (el : text_element) =
   let b = el.base in
+  let fm = font_metrics_of el.font_family in
   let font_family = match el.font_family with
     | 1 -> "Virgil, Hand-drawn, cursive"
     | 2 -> "Cascadia, Helvetica, Arial, sans-serif"
@@ -75,10 +91,12 @@ let render_text_raw (el : text_element) =
     | Left -> b.x | Center -> b.x +. (b.width /. 2.0) | Right -> b.x +. b.width in
   let font_size = el.font_size in
   let font_size_f = float_of_int font_size in
-  let line_height_px = font_size_f *. el.line_height in
+  let line_height_px = font_size_f *. el.line_height *. fm.height_ratio in
+  (* Baseline y from the top of the element, accounting for font metrics *)
+  let baseline_y = b.y +. font_size_f *. fm.baseline_ratio in
   let lines = String.split_on_char '\n' el.text in
   let tspans = List.mapi (fun i line ->
-      let ly = b.y +. font_size_f +. (float_of_int i *. line_height_px) in
+      let ly = baseline_y +. (float_of_int i *. line_height_px) in
       Printf.sprintf "<tspan x=\"%.4g\" y=\"%.4g\">%s</tspan>" text_x ly line
     ) lines in
   let transform = if b.angle <> 0. then
@@ -88,7 +106,7 @@ let render_text_raw (el : text_element) =
   else "" in
   let attrs = [
     float_attr "x" text_x;
-    float_attr "y" (b.y +. font_size_f);
+    float_attr "y" baseline_y;
     attr "font-family" font_family;
     float_attr "font-size" (float_of_int font_size);
     attr "stroke" "none";
@@ -198,7 +216,19 @@ let compute_bbox elements =
   let init = (max_float, max_float, min_float, min_float) in
   List.fold_left (fun (minx, miny, maxx, maxy) el ->
       let b = base_of_element el in
-      (min minx b.x, min miny b.y, max maxx (b.x +. b.width), max maxy (b.y +. b.height))
+      let h = match el with
+        | Text te ->
+          let fm = font_metrics_of te.font_family in
+          let actual_h = b.height *. fm.height_ratio in
+          (* The text extends above the top by (actual_h - stored_h) / 2 *)
+          (* Actually: baseline = y + fontSize * baseline_ratio *)
+          (* The visual top = baseline - (fontSize * 1) where 1 is the em height *)
+          (* Actually from the reference, the visual bounds are:
+             top = y - (fontSize * baseline_ratio - fontSize) = y + fontSize * (1 - baseline_ratio) 
+             ... this is getting complex. Let's just use the height ratio directly. *)
+          actual_h
+        | _ -> b.height in
+      (min minx b.x, min miny b.y, max maxx (b.x +. b.width), max maxy (b.y +. h))
     ) init elements
 
 let render_element_raw = function
@@ -298,10 +328,10 @@ let render ?(scale=1.0) doc =
   let buf = Buffer.create 4096 in
   let pf fmt = Printf.ksprintf (Buffer.add_string buf) fmt in
   pf "<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\"";
-  pf " viewBox=\"0 0 %.4g %.4g\"" vb_w vb_h;
-  pf " width=\"%.4g\" height=\"%.4g\">" (vb_w *. scale) (vb_h *. scale);
+  pf " viewBox=\"0 0 %.15g %.15g\"" vb_w vb_h;
+  pf " width=\"%.15g\" height=\"%.15g\">" (vb_w *. scale) (vb_h *. scale);
   (* Background *)
-  pf "<rect x=\"0\" y=\"0\" width=\"%.4g\" height=\"%.4g\" fill=\"%s\"></rect>" (vb_w *. scale) (vb_h *. scale) bg_color;
+  pf "<rect x=\"0\" y=\"0\" width=\"%.15g\" height=\"%.15g\" fill=\"%s\"></rect>" (vb_w *. scale) (vb_h *. scale) bg_color;
   (* Elements *)
   List.iter (fun el ->
     Buffer.add_string buf (render_element_raw el)
