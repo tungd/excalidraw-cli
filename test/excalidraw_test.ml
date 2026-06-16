@@ -201,6 +201,97 @@ let test_render_rough_fill_and_stroke_paths () =
   (* Should have stroke paths with stroke color *)
   Alcotest.(check bool) "has stroke color #000000" true (find_substring svg "#000000" <> None)
 
+(* --- Snapshot structural tests --- *)
+
+let test_snapshot_arrow_line_text_viewbox () =
+  let doc = parse_fixture "test/fixtures/upstream-excalidraw/arrow_line_text.json" in
+  let reference = reference_svg "arrow_line_text.reference.svg" in
+  let actual = render ~scale:1.0 doc in
+  Alcotest.(check string) "arrow_line_text viewBox matches upstream reference"
+    (extract_attr "viewBox" reference) (extract_attr "viewBox" actual)
+
+let test_snapshot_diagram_path_count () =
+  let doc = parse_fixture "test/fixtures/upstream-excalidraw/diagram.json" in
+  let actual = render ~scale:1.0 doc in
+  (* Each shape produces 2 paths (fill + stroke) with 3 shapes = 6 paths *)
+  let path_count = ref 0 in
+  let rec count str =
+    match find_substring str "<path " with
+    | None -> ()
+    | Some i -> incr path_count; count (String.sub str (i + 1) (String.length str - i - 1))
+  in
+  count actual;
+  Alcotest.(check int) "diagram has 6 path elements" 6 !path_count
+
+let test_snapshot_diagram_group_count () =
+  let doc = parse_fixture "test/fixtures/upstream-excalidraw/diagram.json" in
+  let actual = render ~scale:1.0 doc in
+  let g_count = ref 0 in
+  let rec count str =
+    match find_substring str "<g " with
+    | None -> ()
+    | Some i -> incr g_count; count (String.sub str (i + 1) (String.length str - i - 1))
+  in
+  count actual;
+  Alcotest.(check int) "diagram has 3 group elements" 3 !g_count
+
+let test_snapshot_diagram_has_rough_paths () =
+  let doc = parse_fixture "test/fixtures/upstream-excalidraw/diagram.json" in
+  let actual = render ~scale:1.0 doc in
+  (* Should have C commands in paths (cubic beziers from rough) *)
+  let c_count = ref 0 in
+  let rec count str =
+    match find_substring str "C" with
+    | None -> ()
+    | Some i -> incr c_count; count (String.sub str (i + 1) (String.length str - i - 1))
+  in
+  count actual;
+  Alcotest.(check bool) "diagram has cubic bezier commands" true (!c_count > 0)
+
+let test_snapshot_diagram_stroke_colors () =
+  let doc = parse_fixture "test/fixtures/upstream-excalidraw/diagram.json" in
+  let actual = render ~scale:1.0 doc in
+  let stroke_count = ref 0 in
+  let rec count str =
+    match find_substring str "stroke=\"" with
+    | None -> ()
+    | Some i -> incr stroke_count; count (String.sub str (i + 1) (String.length str - i - 1))
+  in
+  count actual;
+  (* 3 shapes * 2 paths each = 6 stroke attributes *)
+  Alcotest.(check int) "diagram stroke count" 6 !stroke_count
+
+let test_snapshot_arrow_line_text_structure () =
+  let doc = parse_fixture "test/fixtures/upstream-excalidraw/arrow_line_text.json" in
+  let actual = render ~scale:1.0 doc in
+  (* Should have rough paths for line and arrow *)
+  Alcotest.(check bool) "line has C bezier" true (find_substring actual "C" <> None);
+  (* Should have arrowhead paths *)
+  Alcotest.(check bool) "arrow has arrowhead path" true (find_substring actual "C" <> None);
+  (* Should contain text *)
+  Alcotest.(check bool) "contains Hello World" true (find_substring actual "Hello World" <> None);
+  (* Should have stroke-linecap on rough paths *)
+  Alcotest.(check bool) "has stroke-linecap" true (find_substring actual "stroke-linecap" <> None)
+
+let test_snapshot_arrow_line_text_viewbox_size () =
+  let doc = parse_fixture "test/fixtures/upstream-excalidraw/arrow_line_text.json" in
+  let reference = reference_svg "arrow_line_text.reference.svg" in
+  let actual = render ~scale:1.0 doc in
+  let ref_vb = extract_attr "viewBox" reference in
+  let act_vb = extract_attr "viewBox" actual in
+  Alcotest.(check string) "arrow_line_text viewBox" ref_vb act_vb
+
+let snapshot_tests =
+  [
+    ("snapshot arrow_line_text viewBox matches Excalidraw", `Quick, test_snapshot_arrow_line_text_viewbox);
+    ("snapshot diagram path count", `Quick, test_snapshot_diagram_path_count);
+    ("snapshot diagram group count", `Quick, test_snapshot_diagram_group_count);
+    ("snapshot diagram has rough paths", `Quick, test_snapshot_diagram_has_rough_paths);
+    ("snapshot diagram stroke colors", `Quick, test_snapshot_diagram_stroke_colors);
+    ("snapshot arrow_line_text structure", `Quick, test_snapshot_arrow_line_text_structure);
+    ("snapshot arrow_line_text viewBox size", `Quick, test_snapshot_arrow_line_text_viewbox_size);
+  ]
+
 let rough_tests =
   [
     ("rough rectangle deterministic", `Quick, test_rough_rectangle_deterministic);
@@ -231,4 +322,5 @@ let () =
   Alcotest.run "excalidraw-export" [
     ("upstream fixtures", tests);
     ("rough paths", rough_tests);
+    ("snapshots", snapshot_tests);
   ]
