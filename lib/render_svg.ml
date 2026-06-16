@@ -1,106 +1,106 @@
 open Types
 
-module S = Tyxml.Svg
+(* --- Colors, style, transforms --- *)
 
-let px n = (n, Some `Px)
-
-let fill_color_of b =
+let fill_color b =
   if b.background_color = "" || b.background_color = "transparent"
-  then `None else `Color (b.background_color, None)
-
-let opacity_style b =
-  Printf.sprintf "opacity:%.2f" (float_of_int b.opacity /. 100.0)
+  then "none"
+  else b.background_color
 
 let dash_style b = match b.stroke_style with
   | Solid -> ""
   | Dashed -> "stroke-dasharray:8,4"
   | Dotted -> "stroke-dasharray:2,3"
 
-let style_attr b =
-  let parts = [ opacity_style b; dash_style b ] in
-  let s = String.concat ";" (List.filter (fun x -> x <> "") parts) in
-  if s = "" then [] else [ S.a_style s ]
+(* --- Raw SVG element helpers --- *)
 
-let transform_attr (b : base_element) =
-  if b.angle = 0. then []
-  else
-    let cx = b.x +. (b.width /. 2.0) in
-    let cy = b.y +. (b.height /. 2.0) in
-    [ S.a_transform [ `Rotate ((b.angle, Some `Deg), Some (cx, cy)) ] ]
+let attr key value = Printf.sprintf "%s=\"%s\"" key value
 
-let stroke_paint b = `Color (b.stroke_color, None)
+let float_attr key v = attr key (Printf.sprintf "%.4g" v)
+
+let attrs_to_string attrs =
+  String.concat " " (List.filter (fun x -> x <> "") attrs)
+
+let mk name ?(children=[]) attrs =
+  let a_str = attrs_to_string attrs in
+  let children_str = String.concat "" children in
+  if a_str = "" then Printf.sprintf "<%s>%s</%s>" name children_str name
+  else Printf.sprintf "<%s %s>%s</%s>" name a_str children_str name
+
+let void_el name attrs =
+  let a_str = attrs_to_string attrs in
+  if a_str = "" then Printf.sprintf "<%s/>" name
+  else Printf.sprintf "<%s %s/>" name a_str
+
+(* --- Rough shape helpers --- *)
 
 let rough_transform (b : base_element) =
-  [ S.a_transform [ `Translate (b.x, Some b.y); `Rotate ((b.angle, Some `Deg), Some (b.width /. 2.0, b.height /. 2.0)) ] ]
+  Printf.sprintf "translate(%.0f %.0f) rotate(0 %.0f %.0f)"
+    b.x b.y (b.width /. 2.0) (b.height /. 2.0)
 
-let path_attr b d = [
-  S.a_d d;
-  S.a_stroke (stroke_paint b);
-  S.a_stroke_width (px b.raw_stroke_width);
-  S.a_fill `None;
-  S.a_stroke_linecap `Round;
-]
+let rough_path_attrs stroke_color w d =
+  let parts = [
+    attr "d" d;
+    attr "stroke" stroke_color;
+    float_attr "stroke-width" w;
+    attr "fill" "none";
+    attr "stroke-linecap" "round";
+  ] in
+  String.concat " " parts
 
-let fill_path_attr b d = [
-  S.a_d d;
-  S.a_stroke (fill_color_of b);
-  S.a_stroke_width (px (b.raw_stroke_width /. 2.0));
-  S.a_fill `None;
-  S.a_stroke_linecap `Round;
-]
+let rough_svg b fill_d stroke_d =
+  let fill_path = void_el "path" [rough_path_attrs (fill_color b) (b.raw_stroke_width /. 2.0) fill_d] in
+  let stroke_path = void_el "path" [rough_path_attrs b.stroke_color b.raw_stroke_width stroke_d] in
+  let style = if b.opacity <> 100 then
+    [Printf.sprintf "opacity:%.2f" (float_of_int b.opacity /. 100.0)]
+  else [] in
+  let all_attrs = [
+    attr "stroke-linecap" "round";
+    Printf.sprintf "transform=\"%s\"" (rough_transform b);
+  ] @ (match style with [] -> [] | _ -> [Printf.sprintf " style=\"%s\"" (String.concat ";" style)]) in
+  mk "g" ~children:[fill_path; stroke_path] all_attrs
 
-(* --- Element renderers --- *)
-let render_rectangle (el : rectangle_element) =
-  let b = el.base in
-  let stroke_d, fill_d = Rough.rectangle ~seed:b.seed ~roughness:b.roughness ~stroke_width:b.raw_stroke_width ~width:b.width ~height:b.height in
-  let fill_path = S.path ~a:(fill_path_attr b fill_d) [] in
-  let stroke_path = S.path ~a:(path_attr b stroke_d) [] in
-  S.g ~a:(rough_transform b @ style_attr b) [ fill_path; stroke_path ]
+(* --- Text element --- *)
 
-let render_ellipse (el : ellipse_element) =
-  let b = el.base in
-  let stroke_d, fill_d = Rough.ellipse ~seed:b.seed ~roughness:b.roughness ~stroke_width:b.raw_stroke_width ~width:b.width ~height:b.height in
-  let fill_path = S.path ~a:(fill_path_attr b fill_d) [] in
-  let stroke_path = S.path ~a:(path_attr b stroke_d) [] in
-  S.g ~a:(rough_transform b @ style_attr b) [ fill_path; stroke_path ]
-
-let render_diamond (el : diamond_element) =
-  let b = el.base in
-  let stroke_d, fill_d = Rough.diamond ~seed:b.seed ~roughness:b.roughness ~stroke_width:b.raw_stroke_width ~width:b.width ~height:b.height in
-  let fill_path = S.path ~a:(fill_path_attr b fill_d) [] in
-  let stroke_path = S.path ~a:(path_attr b stroke_d) [] in
-  S.g ~a:(rough_transform b @ style_attr b) [ fill_path; stroke_path ]
-
-let render_text (el : text_element) =
+let render_text_raw (el : text_element) =
   let b = el.base in
   let font_family = match el.font_family with
     | 1 -> "Virgil, Hand-drawn, cursive"
     | 2 -> "Cascadia, Helvetica, Arial, sans-serif"
     | 3 -> "Fira Code, monospace"
     | _ -> "Hand-drawn, cursive" in
-  let anchor_attr = match el.text_align with
-    | Left -> [ S.a_text_anchor `Start ]
-    | Center -> [ S.a_text_anchor `Middle ]
-    | Right -> [ S.a_text_anchor `End ] in
+  let anchor = match el.text_align with
+    | Left -> "start" | Center -> "middle" | Right -> "end" in
   let text_x = match el.text_align with
-    | Left -> b.x
-    | Center -> b.x +. (b.width /. 2.0)
-    | Right -> b.x +. b.width in
-  let font_size_f = float_of_int el.font_size in
+    | Left -> b.x | Center -> b.x +. (b.width /. 2.0) | Right -> b.x +. b.width in
+  let font_size = el.font_size in
+  let font_size_f = float_of_int font_size in
   let line_height_px = font_size_f *. el.line_height in
   let lines = String.split_on_char '\n' el.text in
   let tspans = List.mapi (fun i line ->
       let ly = b.y +. font_size_f +. (float_of_int i *. line_height_px) in
-      S.tspan ~a:[ S.a_x_list [ px text_x ]; S.a_y_list [ px ly ] ] [ S.txt line ]
+      Printf.sprintf "<tspan x=\"%.4g\" y=\"%.4g\">%s</tspan>" text_x ly line
     ) lines in
-  let inner = S.text ~a:([
-    S.a_x_list [ px text_x ]; S.a_y_list [ px (b.y +. font_size_f) ];
-    S.a_font_family font_family; S.a_font_size (string_of_int el.font_size);
-    S.a_stroke `None; S.a_fill (stroke_paint b);
-  ] @ anchor_attr @ transform_attr b) tspans in
-  S.g ~a:(style_attr b) [ inner ]
+  let transform = if b.angle <> 0. then
+    let cx = b.x +. (b.width /. 2.0) in
+    let cy = b.y +. (b.height /. 2.0) in
+    Printf.sprintf " transform=\"rotate(%.4g %.4g %.4g)\"" b.angle cx cy
+  else "" in
+  let attrs = [
+    float_attr "x" text_x;
+    float_attr "y" (b.y +. font_size_f);
+    attr "font-family" font_family;
+    float_attr "font-size" (float_of_int font_size);
+    attr "stroke" "none";
+    attr "fill" b.stroke_color;
+    attr "text-anchor" anchor;
+    attr "style" (Printf.sprintf "opacity:%.2f" (float_of_int b.opacity /. 100.0));
+  ] @ (if transform <> "" then [transform] else []) in
+  mk "text" ~children:(List.map (fun t -> t) tspans) attrs
 
-let render_linear ~is_arrow (el : linear_element) =
+(* --- Linear (line/arrow) element --- *)
+
+let render_linear_raw ~is_arrow (el : linear_element) =
   let b = el.base in
   let d_str = match el.points with
     | [] -> Printf.sprintf "M%.2f,%.2f L%.2f,%.2f" b.x b.y (b.x +. b.width) (b.y +. b.height)
@@ -110,23 +110,37 @@ let render_linear ~is_arrow (el : linear_element) =
           Printf.sprintf "L%.2f,%.2f" (b.x +. px2) (b.y +. py2)
         ) in
       Printf.sprintf "M%.2f,%.2f%s" (b.x +. fx) (b.y +. fy) (String.concat "" segs) in
-  let extra = if is_arrow then "marker-end:url(#arrowhead)" else "" in
-  let style_parts = [ opacity_style b; dash_style b; extra ] in
-  let s = String.concat ";" (List.filter (fun x -> x <> "") style_parts) in
-  S.path ~a:([
-    S.a_d (d_str); S.a_stroke (stroke_paint b);
-    S.a_stroke_width (px b.raw_stroke_width); S.a_fill `None;
-  ] @ [ S.a_style s ] @ transform_attr b) []
+  let extra = if is_arrow then ";marker-end:url(#arrowhead)" else "" in
+  let style = Printf.sprintf "opacity:%.2f%s" (float_of_int b.opacity /. 100.0)
+    (if dash_style b <> "" then ";" ^ dash_style b ^ extra else extra) in
+  let path_attrs = [
+    attr "d" d_str;
+    attr "stroke" b.stroke_color;
+    float_attr "stroke-width" b.raw_stroke_width;
+    attr "fill" "none";
+    attr "style" style;
+  ] @ (if b.angle <> 0. then
+    let cx = b.x +. (b.width /. 2.0) in
+    let cy = b.y +. (b.height /. 2.0) in
+    [Printf.sprintf "transform=\"rotate(%.4g %.4g %.4g)\"" b.angle cx cy]
+  else []) in
+  void_el "path" path_attrs
 
-let render_frame (el : frame_element) =
+(* --- Frame element --- *)
+
+let render_frame_raw (el : frame_element) =
   let b = el.base in
-  S.rect ~a:[
-    S.a_x (px b.x); S.a_y (px b.y);
-    S.a_width (px b.width); S.a_height (px b.height);
-    S.a_stroke (`Color ("#aaaaaa", None)); S.a_stroke_width (px 1.0);
-    S.a_fill `None; S.a_rx (px 4.); S.a_ry (px 4.);
-    S.a_style ("stroke-dasharray:4,2;opacity:0.8");
-  ] []
+  let attrs = [
+    float_attr "x" b.x; float_attr "y" b.y;
+    float_attr "width" b.width; float_attr "height" b.height;
+    attr "stroke" "#aaaaaa"; float_attr "stroke-width" 1.0;
+    attr "fill" "none";
+    float_attr "rx" 4.0; float_attr "ry" 4.0;
+    attr "style" "stroke-dasharray:4,2;opacity:0.8";
+  ] in
+  void_el "rect" attrs
+
+(* --- Element dispatch --- *)
 
 let base_of_element = function
   | Rectangle e -> e.base | Ellipse e -> e.base | Diamond e -> e.base
@@ -163,15 +177,23 @@ let compute_bbox elements =
 let has_arrows elements =
   List.exists (function Arrow _ -> true | _ -> false) elements
 
-let render_element = function
-  | Rectangle el -> render_rectangle el
-  | Ellipse el -> render_ellipse el
-  | Diamond el -> render_diamond el
-  | Text el -> render_text el
-  | Line el -> render_linear ~is_arrow:false el
-  | Arrow el -> render_linear ~is_arrow:true el
-  | Frame el -> render_frame el
-  | Image _ | Unknown _ -> S.g []
+let render_element_raw = function
+  | Rectangle el ->
+    let (stroke_d, fill_d) = Rough.rectangle ~seed:el.base.seed ~roughness:el.base.roughness ~stroke_width:el.base.raw_stroke_width ~width:el.base.width ~height:el.base.height in
+    rough_svg el.base fill_d stroke_d
+  | Ellipse el ->
+    let (stroke_d, fill_d) = Rough.ellipse ~seed:el.base.seed ~roughness:el.base.roughness ~stroke_width:el.base.raw_stroke_width ~width:el.base.width ~height:el.base.height in
+    rough_svg el.base fill_d stroke_d
+  | Diamond el ->
+    let (stroke_d, fill_d) = Rough.diamond ~seed:el.base.seed ~roughness:el.base.roughness ~stroke_width:el.base.raw_stroke_width ~width:el.base.width ~height:el.base.height in
+    rough_svg el.base fill_d stroke_d
+  | Text el -> render_text_raw el
+  | Line el -> render_linear_raw ~is_arrow:false el
+  | Arrow el -> render_linear_raw ~is_arrow:true el
+  | Frame el -> render_frame_raw el
+  | Image _ | Unknown _ -> ""
+
+(* --- Main render function --- *)
 
 let render ?(scale=1.0) doc =
   let padding = 10.0 in
@@ -184,39 +206,25 @@ let render ?(scale=1.0) doc =
   let offset_y = -.miny +. padding in
   let elements = List.map (translate_element offset_x offset_y) doc.elements in
   let bg_color = doc.app_state.view_background_color in
-  let defs =
-    if has_arrows elements then [
-      S.defs ~a:[] [
-        S.marker ~a:[
-          S.a_id ("arrowhead");
-          S.a_markerWidth (px 10.); S.a_markerHeight (px 7.);
-          S.a_refX (px 10.); S.a_refY (px 3.5);
-          S.a_orient (Some (0., Some `Deg));
-        ] [
-          S.polygon ~a:[
-            S.a_points [ (0., 0.); (10., 3.5); (0., 7.) ];
-            S.a_fill `None;
-            S.a_stroke (`Color ("context-stroke", None));
-          ] [];
-        ];
-      ]
-    ] else [] in
-  let bg_rect =
-    S.rect ~a:[
-      S.a_x (px 0.); S.a_y (px 0.);
-      S.a_width (px vb_w); S.a_height (px vb_h);
-      S.a_fill (`Color (bg_color, None));
-    ] [] in
-  let children = defs @ [ bg_rect ] @ List.map render_element elements in
-  let svg_doc =
-    S.svg ~a:[
-      S.a_viewBox (0., 0., vb_w, vb_h);
-      S.a_width (px (vb_w *. scale));
-      S.a_height (px (vb_h *. scale));
-    ] children in
-  let xml_decl = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" in
   let buf = Buffer.create 4096 in
-  let fmt = Format.formatter_of_buffer buf in
-  Tyxml.Svg.pp ~indent:true () fmt svg_doc;
-  Format.pp_print_flush fmt ();
-  xml_decl ^ Buffer.contents buf
+  let pf fmt = Printf.ksprintf (Buffer.add_string buf) fmt in
+  pf "<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\"";
+  pf " viewBox=\"0 0 %.4g %.4g\"" vb_w vb_h;
+  pf " width=\"%.4g\" height=\"%.4g\">" (vb_w *. scale) (vb_h *. scale);
+  (* Defs *)
+  if has_arrows elements then begin
+    pf "<defs>";
+    pf "<marker id=\"arrowhead\" markerWidth=\"10\" markerHeight=\"7\"";
+    pf " refX=\"10\" refY=\"3.5\" orient=\"0deg\">";
+    pf "<polygon points=\"0 0, 10 3.5, 0 7\" fill=\"none\" stroke=\"context-stroke\"/>";
+    pf "</marker>";
+    pf "</defs>"
+  end;
+  (* Background *)
+  pf "<rect x=\"0\" y=\"0\" width=\"%.4g\" height=\"%.4g\" fill=\"%s\"></rect>" (vb_w *. scale) (vb_h *. scale) bg_color;
+  (* Elements *)
+  List.iter (fun el ->
+    Buffer.add_string buf (render_element_raw el)
+  ) elements;
+  pf "</svg>";
+  Buffer.contents buf
