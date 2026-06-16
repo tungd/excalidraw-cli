@@ -355,11 +355,23 @@ let cross_hatch_fill polygon_list o =
   let pass2 = hachure_fill polygon_list o2 in
   pass1 @ pass2
 
+(* --- Roughness adjustment for small elements (matching Excalidraw) --- *)
+
+let adjust_roughness ~width ~height ~has_roundness roughness =
+  let max_size = max width height in
+  let min_size = min width height in
+  if (min_size >= 20.0 && max_size >= 50.0) || (min_size >= 15.0 && has_roundness) then
+    float roughness
+  else
+    let divisor = if max_size < 10.0 then 6.0 else if max_size < 15.0 then 4.0 else 3.0 in
+    min (float roughness /. divisor) 0.6
+
 (* --- Public API: shape generators returning (stroke_path, fill_path) --- *)
 
 let rectangle ~seed ~roughness ~stroke_width ~width ~height ?(fill_style="hachure") ?(stroke_style="solid") ?(roundness=0.0) () =
+  let adjusted = adjust_roughness ~width ~height ~has_roundness:(roundness > 0.0) roughness in
   let disable_ms = stroke_style <> "solid" in
-  let o = default_options ~seed ~roughness:(float roughness) ~stroke_width ~disable_multi_stroke:disable_ms () in
+  let o = default_options ~seed ~roughness:adjusted ~stroke_width ~disable_multi_stroke:disable_ms () in
   let stroke_opsets = rectangle_ops 0.0 0.0 width height o roundness in
   let polygon = [(0.0, 0.0); (width, 0.0); (width, height); (0.0, height)] in
   let fill_d =
@@ -374,8 +386,9 @@ let rectangle ~seed ~roughness ~stroke_width ~width ~height ?(fill_style="hachur
   (stroke_d, fill_d)
 
 let ellipse ~seed ~roughness ~stroke_width ~width ~height ?(fill_style="hachure") ?(stroke_style="solid") () =
+  let adjusted = adjust_roughness ~width ~height ~has_roundness:false roughness in
   let disable_ms = stroke_style <> "solid" in
-  let o = default_options ~seed ~roughness:(float roughness) ~stroke_width ~disable_multi_stroke:disable_ms () in
+  let o = default_options ~seed ~roughness:adjusted ~stroke_width ~disable_multi_stroke:disable_ms () in
   let cx = width /. 2.0 in
   let cy = height /. 2.0 in
   let stroke_opsets = ellipse_ops cx cy width height o in
@@ -398,8 +411,9 @@ let ellipse ~seed ~roughness ~stroke_width ~width ~height ?(fill_style="hachure"
   (stroke_d, fill_d)
 
 let diamond ~seed ~roughness ~stroke_width ~width ~height ?(fill_style="hachure") ?(stroke_style="solid") () =
+  let adjusted = adjust_roughness ~width ~height ~has_roundness:false roughness in
   let disable_ms = stroke_style <> "solid" in
-  let o = default_options ~seed ~roughness:(float roughness) ~stroke_width ~disable_multi_stroke:disable_ms () in
+  let o = default_options ~seed ~roughness:adjusted ~stroke_width ~disable_multi_stroke:disable_ms () in
   let cx = width /. 2.0 in
   let cy = height /. 2.0 in
   let stroke_opsets = diamond_ops 0.0 0.0 width height o in
