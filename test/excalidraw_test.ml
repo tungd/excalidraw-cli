@@ -137,6 +137,84 @@ let test_snapshot_diagram_background_matches_excalidraw () =
     (extract_attr "height" reference)
     (strip_px (extract_attr "height" actual))
 
+let test_rough_rectangle_deterministic () =
+  let (stroke1, fill1) = Excalidraw_export.Rough.rectangle ~seed:12345 ~roughness:1 ~width:200.0 ~height:100.0 in
+  let (stroke2, fill2) = Excalidraw_export.Rough.rectangle ~seed:12345 ~roughness:1 ~width:200.0 ~height:100.0 in
+  Alcotest.(check string) "stroke deterministic" stroke1 stroke2;
+  Alcotest.(check string) "fill deterministic" fill1 fill2
+
+let test_rough_ellipse_deterministic () =
+  let (stroke1, fill1) = Excalidraw_export.Rough.ellipse ~seed:99999 ~roughness:1 ~width:200.0 ~height:100.0 in
+  let (stroke2, fill2) = Excalidraw_export.Rough.ellipse ~seed:99999 ~roughness:1 ~width:200.0 ~height:100.0 in
+  Alcotest.(check string) "stroke deterministic" stroke1 stroke2;
+  Alcotest.(check string) "fill deterministic" fill1 fill2
+
+let test_rough_diamond_deterministic () =
+  let (stroke1, fill1) = Excalidraw_export.Rough.diamond ~seed:42 ~roughness:1 ~width:200.0 ~height:100.0 in
+  let (stroke2, fill2) = Excalidraw_export.Rough.diamond ~seed:42 ~roughness:1 ~width:200.0 ~height:100.0 in
+  Alcotest.(check string) "stroke deterministic" stroke1 stroke2;
+  Alcotest.(check string) "fill deterministic" fill1 fill2
+
+let test_rough_different_seeds_differ () =
+  let (stroke1, _) = Excalidraw_export.Rough.rectangle ~seed:1 ~roughness:1 ~width:200.0 ~height:100.0 in
+  let (stroke2, _) = Excalidraw_export.Rough.rectangle ~seed:2 ~roughness:1 ~width:200.0 ~height:100.0 in
+  Alcotest.(check bool) "different seeds produce different paths" true (stroke1 <> stroke2)
+
+let test_rough_rectangle_has_cubic_beziers () =
+  let (stroke, fill) = Excalidraw_export.Rough.rectangle ~seed:1041657908 ~roughness:1 ~width:214.0 ~height:214.0 in
+  Alcotest.(check bool) "stroke has C commands" true (String.contains stroke 'C');
+  Alcotest.(check bool) "fill has C commands" true (String.contains fill 'C');
+  Alcotest.(check bool) "stroke has M commands" true (String.contains stroke 'M');
+  Alcotest.(check bool) "fill has M commands" true (String.contains fill 'M')
+
+let test_rough_ellipse_has_cubic_beziers () =
+  let (stroke, fill) = Excalidraw_export.Rough.ellipse ~seed:1041657908 ~roughness:1 ~width:214.0 ~height:214.0 in
+  Alcotest.(check bool) "stroke has C commands" true (String.contains stroke 'C');
+  Alcotest.(check bool) "fill has C commands" true (String.contains fill 'C')
+
+let test_rough_diamond_has_cubic_beziers () =
+  let (stroke, fill) = Excalidraw_export.Rough.diamond ~seed:1041657908 ~roughness:1 ~width:214.0 ~height:214.0 in
+  Alcotest.(check bool) "stroke has C commands" true (String.contains stroke 'C');
+  Alcotest.(check bool) "fill has C commands" true (String.contains fill 'C')
+
+let test_rough_roughness_0_no_jitter () =
+  let (stroke, _) = Excalidraw_export.Rough.rectangle ~seed:12345 ~roughness:0 ~width:200.0 ~height:100.0 in
+  (* With roughness 0, maxRandomnessOffset = 0, so all random offsets should be 0 *)
+  (* The path should still have M and C commands but with zero offsets *)
+  Alcotest.(check bool) "stroke has M commands" true (String.contains stroke 'M')
+
+let test_render_rough_paths_in_svg () =
+  let doc = parse_fixture "test/fixtures/upstream-excalidraw/diagram.json" in
+  let svg = render ~scale:1.0 doc in
+  (* Should have stroke-linecap="round" on rough paths *)
+  Alcotest.(check bool) "has stroke-linecap" true (find_substring svg "stroke-linecap" <> None);
+  (* Should have cubic bezier C commands from rough paths *)
+  Alcotest.(check bool) "has C commands" true (String.contains svg 'C');
+  (* Should have translate transform for rough shapes *)
+  Alcotest.(check bool) "has translate" true (find_substring svg "translate" <> None)
+
+let test_render_rough_fill_and_stroke_paths () =
+  let doc = parse_fixture "test/fixtures/upstream-excalidraw/diagram.json" in
+  let svg = render ~scale:1.0 doc in
+  (* Should have hachure fill paths with background color *)
+  Alcotest.(check bool) "has fill color #15aabf" true (find_substring svg "#15aabf" <> None);
+  (* Should have stroke paths with stroke color *)
+  Alcotest.(check bool) "has stroke color #000000" true (find_substring svg "#000000" <> None)
+
+let rough_tests =
+  [
+    ("rough rectangle deterministic", `Quick, test_rough_rectangle_deterministic);
+    ("rough ellipse deterministic", `Quick, test_rough_ellipse_deterministic);
+    ("rough diamond deterministic", `Quick, test_rough_diamond_deterministic);
+    ("rough different seeds differ", `Quick, test_rough_different_seeds_differ);
+    ("rough rectangle has cubic beziers", `Quick, test_rough_rectangle_has_cubic_beziers);
+    ("rough ellipse has cubic beziers", `Quick, test_rough_ellipse_has_cubic_beziers);
+    ("rough diamond has cubic beziers", `Quick, test_rough_diamond_has_cubic_beziers);
+    ("rough roughness 0 no jitter", `Quick, test_rough_roughness_0_no_jitter);
+    ("render rough paths in SVG", `Quick, test_render_rough_paths_in_svg);
+    ("render rough fill and stroke paths", `Quick, test_render_rough_fill_and_stroke_paths);
+  ]
+
 let tests =
   [
     ("parse upstream diagram", `Quick, test_parse_upstream_diagram);
@@ -152,4 +230,5 @@ let tests =
 let () =
   Alcotest.run "excalidraw-export" [
     ("upstream fixtures", tests);
+    ("rough paths", rough_tests);
   ]
