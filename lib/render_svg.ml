@@ -7,11 +7,6 @@ let fill_color b =
   then "none"
   else b.background_color
 
-let dash_style b = match b.stroke_style with
-  | Solid -> ""
-  | Dashed -> "stroke-dasharray:8,4"
-  | Dotted -> "stroke-dasharray:2,3"
-
 (* --- Raw SVG element helpers --- *)
 
 let attr key value = Printf.sprintf "%s=\"%s\"" key value
@@ -100,31 +95,58 @@ let render_text_raw (el : text_element) =
 
 (* --- Linear (line/arrow) element --- *)
 
+let rough_linear_svg (b : base_element) stroke_paths =
+  let style = if b.opacity <> 100 then
+    [Printf.sprintf "opacity:%.2f" (float_of_int b.opacity /. 100.0)]
+  else [] in
+  let transform = Printf.sprintf "translate(%.0f %.0f) rotate(0 %.0f %.0f)"
+    b.x b.y (b.width /. 2.0) (b.height /. 2.0) in
+  let path_els = List.map (fun d ->
+    void_el "path" [rough_path_attrs b.stroke_color b.raw_stroke_width d]
+  ) stroke_paths in
+  let all_attrs = [
+    attr "stroke-linecap" "round";
+    Printf.sprintf "transform=\"%s\"" transform;
+  ] @ (match style with [] -> [] | _ -> [Printf.sprintf " style=\"%s\"" (String.concat ";" style)]) in
+  mk "g" ~children:path_els all_attrs
+
 let render_linear_raw ~is_arrow (el : linear_element) =
   let b = el.base in
-  let d_str = match el.points with
-    | [] -> Printf.sprintf "M%.2f,%.2f L%.2f,%.2f" b.x b.y (b.x +. b.width) (b.y +. b.height)
-    | pts ->
-      let (fx, fy) = List.hd pts in
-      let segs = List.tl pts |> List.map (fun (px2, py2) ->
-          Printf.sprintf "L%.2f,%.2f" (b.x +. px2) (b.y +. py2)
-        ) in
-      Printf.sprintf "M%.2f,%.2f%s" (b.x +. fx) (b.y +. fy) (String.concat "" segs) in
-  let extra = if is_arrow then ";marker-end:url(#arrowhead)" else "" in
-  let style = Printf.sprintf "opacity:%.2f%s" (float_of_int b.opacity /. 100.0)
-    (if dash_style b <> "" then ";" ^ dash_style b ^ extra else extra) in
-  let path_attrs = [
-    attr "d" d_str;
-    attr "stroke" b.stroke_color;
-    float_attr "stroke-width" b.raw_stroke_width;
-    attr "fill" "none";
-    attr "style" style;
-  ] @ (if b.angle <> 0. then
-    let cx = b.x +. (b.width /. 2.0) in
-    let cy = b.y +. (b.height /. 2.0) in
-    [Printf.sprintf "transform=\"rotate(%.4g %.4g %.4g)\"" b.angle cx cy]
-  else []) in
-  void_el "path" path_attrs
+  let points = match el.points with
+    | [] -> [(0.0, 0.0); (b.width, b.height)]
+    | pts -> pts
+  in
+  let stroke_d = Rough.line
+    ~seed:b.seed ~roughness:b.roughness
+    ~stroke_width:b.raw_stroke_width
+    ~points
+  in
+  let arrowhead_paths =
+    if is_arrow then begin
+      let n = List.length points in
+      let (px1, py1) = if n >= 2 then List.nth points (n - 2) else (0.0, 0.0) in
+      let (px2, py2) = List.nth points (n - 1) in
+      let end_paths = match el.end_arrowhead with
+        | Some "arrow" ->
+          Rough.arrowhead ~seed:b.seed ~roughness:b.roughness
+            ~stroke_width:b.raw_stroke_width
+            ~x1:px1 ~y1:py1 ~x2:px2 ~y2:py2
+        | _ -> []
+      in
+      let start_paths = match el.start_arrowhead with
+        | Some "arrow" ->
+          let (sx1, sy1) = List.hd points in
+          let (sx2, sy2) = if n >= 2 then List.nth points 1 else (0.0, 0.0) in
+          Rough.arrowhead ~seed:b.seed ~roughness:b.roughness
+            ~stroke_width:b.raw_stroke_width
+            ~x1:sx2 ~y1:sy2 ~x2:sx1 ~y2:sy1
+        | _ -> []
+      in
+      end_paths @ start_paths
+    end else []
+  in
+  let all_paths = stroke_d :: arrowhead_paths in
+  rough_linear_svg b all_paths
 
 (* --- Frame element --- *)
 
@@ -174,9 +196,6 @@ let compute_bbox elements =
       (min minx b.x, min miny b.y, max maxx (b.x +. b.width), max maxy (b.y +. b.height))
     ) init elements
 
-let has_arrows elements =
-  List.exists (function Arrow _ -> true | _ -> false) elements
-
 let render_element_raw = function
   | Rectangle el ->
     let (stroke_d, fill_d) = Rough.rectangle ~seed:el.base.seed ~roughness:el.base.roughness ~stroke_width:el.base.raw_stroke_width ~width:el.base.width ~height:el.base.height in
@@ -211,15 +230,6 @@ let render ?(scale=1.0) doc =
   pf "<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\"";
   pf " viewBox=\"0 0 %.4g %.4g\"" vb_w vb_h;
   pf " width=\"%.4g\" height=\"%.4g\">" (vb_w *. scale) (vb_h *. scale);
-  (* Defs *)
-  if has_arrows elements then begin
-    pf "<defs>";
-    pf "<marker id=\"arrowhead\" markerWidth=\"10\" markerHeight=\"7\"";
-    pf " refX=\"10\" refY=\"3.5\" orient=\"0deg\">";
-    pf "<polygon points=\"0 0, 10 3.5, 0 7\" fill=\"none\" stroke=\"context-stroke\"/>";
-    pf "</marker>";
-    pf "</defs>"
-  end;
   (* Background *)
   pf "<rect x=\"0\" y=\"0\" width=\"%.4g\" height=\"%.4g\" fill=\"%s\"></rect>" (vb_w *. scale) (vb_h *. scale) bg_color;
   (* Elements *)

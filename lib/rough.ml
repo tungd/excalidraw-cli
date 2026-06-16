@@ -316,3 +316,45 @@ let diamond ~seed ~roughness ~stroke_width ~width ~height =
   let stroke_d = String.concat " " (List.map opset_to_path stroke_opsets) in
   let fill_d = String.concat " " (List.map opset_to_path fill_opsets) in
   (stroke_d, fill_d)
+
+(* --- Line (multi-segment linear element) --- *)
+
+let line_ops points o =
+  let ops = ref [] in
+  let pts = points in
+  let n = List.length pts in
+  if n >= 2 then begin
+    for i = 0 to n - 2 do
+      let (x1, y1) = List.nth pts i in
+      let (x2, y2) = List.nth pts (i + 1) in
+      ops := !ops @ _double_line x1 y1 x2 y2 o
+    done
+  end;
+  [{ typ = "path"; ops = !ops }]
+
+let line ~seed ~roughness ~stroke_width ~points =
+  let o = default_options ~seed ~roughness:(float roughness) ~stroke_width in
+  let stroke_opsets = line_ops points o in
+  let stroke_d = String.concat " " (List.map opset_to_path stroke_opsets) in
+  stroke_d
+
+(* --- Arrowhead generation matching rough.js / Excalidraw --- *)
+
+let arrowhead_ops x1 y1 x2 y2 o =
+  let angle = atan2 (y2 -. y1) (x2 -. x1) in
+  let size = max 10.0 (o.strokeWidth *. 4.0) in
+  let arrow_angle = Float.pi /. 6.0 in
+  let len1 = size in
+  let len2 = size in
+  let ax1 = x2 -. len1 *. cos (angle -. arrow_angle) in
+  let ay1 = y2 -. len1 *. sin (angle -. arrow_angle) in
+  let ax2 = x2 -. len2 *. cos (angle +. arrow_angle) in
+  let ay2 = y2 -. len2 *. sin (angle +. arrow_angle) in
+  let ops1 = _single_line x2 y2 ax1 ay1 o ~move:true ~overlay:false in
+  let ops2 = _single_line x2 y2 ax2 ay2 o ~move:true ~overlay:false in
+  [{ typ = "path"; ops = ops1 }; { typ = "path"; ops = ops2 }]
+
+let arrowhead ~seed ~roughness ~stroke_width ~x1 ~y1 ~x2 ~y2 =
+  let o = default_options ~seed ~roughness:(float roughness) ~stroke_width in
+  let opsets = arrowhead_ops x1 y1 x2 y2 o in
+  List.map opset_to_path opsets
