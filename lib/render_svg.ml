@@ -43,17 +43,6 @@ let rough_path_attrs stroke_color w d =
   ] in
   String.concat " " parts
 
-let rough_svg b fill_d stroke_d =
-  let fill_path = void_el "path" [rough_path_attrs (fill_color b) (b.raw_stroke_width /. 2.0) fill_d] in
-  let stroke_path = void_el "path" [rough_path_attrs b.stroke_color b.raw_stroke_width stroke_d] in
-  let style = if b.opacity <> 100 then
-    [Printf.sprintf "opacity:%.2f" (float_of_int b.opacity /. 100.0)]
-  else [] in
-  let all_attrs = [
-    attr "stroke-linecap" "round";
-    Printf.sprintf "transform=\"%s\"" (rough_transform b);
-  ] @ (match style with [] -> [] | _ -> [Printf.sprintf " style=\"%s\"" (String.concat ";" style)]) in
-  mk "g" ~children:[fill_path; stroke_path] all_attrs
 
 (* --- Text element --- *)
 
@@ -198,14 +187,79 @@ let compute_bbox elements =
 
 let render_element_raw = function
   | Rectangle el ->
-    let (stroke_d, fill_d) = Rough.rectangle ~seed:el.base.seed ~roughness:el.base.roughness ~stroke_width:el.base.raw_stroke_width ~width:el.base.width ~height:el.base.height in
-    rough_svg el.base fill_d stroke_d
+    let fill_style = match el.base.fill_style with Solid -> "solid" | Hachure -> "hachure" | Cross_hatch -> "cross-hatch" in
+    let (stroke_d, fill_d) = Rough.rectangle ~fill_style ~seed:el.base.seed ~roughness:el.base.roughness ~stroke_width:el.base.raw_stroke_width ~width:el.base.width ~height:el.base.height () in
+    let b = el.base in
+    let style = if b.opacity <> 100 then
+      [Printf.sprintf "opacity:%.2f" (float_of_int b.opacity /. 100.0)]
+    else [] in
+    let attrs = [
+      attr "stroke-linecap" "round";
+      Printf.sprintf "transform=\"%s\"" (rough_transform b);
+    ] @ (match style with [] -> [] | _ -> [Printf.sprintf " style=\"%s\"" (String.concat ";" style)]) in
+    let stroke_path = void_el "path" [rough_path_attrs b.stroke_color b.raw_stroke_width stroke_d] in
+    if fill_style = "solid" && fill_color b <> "none" then begin
+      let fill_shape = void_el "rect" [
+        float_attr "x" 0.; float_attr "y" 0.;
+        float_attr "width" b.width; float_attr "height" b.height;
+        attr "fill" (fill_color b);
+      ] in
+      mk "g" ~children:[fill_shape; stroke_path] attrs
+    end else if fill_d <> "" then begin
+      let fill_path = void_el "path" [rough_path_attrs (fill_color b) (b.raw_stroke_width /. 2.0) fill_d] in
+      mk "g" ~children:[fill_path; stroke_path] attrs
+    end else
+      mk "g" ~children:[stroke_path] attrs
   | Ellipse el ->
-    let (stroke_d, fill_d) = Rough.ellipse ~seed:el.base.seed ~roughness:el.base.roughness ~stroke_width:el.base.raw_stroke_width ~width:el.base.width ~height:el.base.height in
-    rough_svg el.base fill_d stroke_d
+    let fill_style = match el.base.fill_style with Solid -> "solid" | Hachure -> "hachure" | Cross_hatch -> "cross-hatch" in
+    let (stroke_d, fill_d) = Rough.ellipse ~fill_style ~seed:el.base.seed ~roughness:el.base.roughness ~stroke_width:el.base.raw_stroke_width ~width:el.base.width ~height:el.base.height () in
+    let b = el.base in
+    let style = if b.opacity <> 100 then
+      [Printf.sprintf "opacity:%.2f" (float_of_int b.opacity /. 100.0)]
+    else [] in
+    let attrs = [
+      attr "stroke-linecap" "round";
+      Printf.sprintf "transform=\"%s\"" (rough_transform b);
+    ] @ (match style with [] -> [] | _ -> [Printf.sprintf " style=\"%s\"" (String.concat ";" style)]) in
+    let stroke_path = void_el "path" [rough_path_attrs b.stroke_color b.raw_stroke_width stroke_d] in
+    if fill_style = "solid" && fill_color b <> "none" then begin
+      let fill_shape = void_el "ellipse" [
+        float_attr "cx" (b.width /. 2.); float_attr "cy" (b.height /. 2.);
+        float_attr "rx" (b.width /. 2.); float_attr "ry" (b.height /. 2.);
+        attr "fill" (fill_color b);
+      ] in
+      mk "g" ~children:[fill_shape; stroke_path] attrs
+    end else if fill_d <> "" then begin
+      let fill_path = void_el "path" [rough_path_attrs (fill_color b) (b.raw_stroke_width /. 2.0) fill_d] in
+      mk "g" ~children:[fill_path; stroke_path] attrs
+    end else
+      mk "g" ~children:[stroke_path] attrs
   | Diamond el ->
-    let (stroke_d, fill_d) = Rough.diamond ~seed:el.base.seed ~roughness:el.base.roughness ~stroke_width:el.base.raw_stroke_width ~width:el.base.width ~height:el.base.height in
-    rough_svg el.base fill_d stroke_d
+    let fill_style = match el.base.fill_style with Solid -> "solid" | Hachure -> "hachure" | Cross_hatch -> "cross-hatch" in
+    let (stroke_d, fill_d) = Rough.diamond ~fill_style ~seed:el.base.seed ~roughness:el.base.roughness ~stroke_width:el.base.raw_stroke_width ~width:el.base.width ~height:el.base.height () in
+    let b = el.base in
+    let style = if b.opacity <> 100 then
+      [Printf.sprintf "opacity:%.2f" (float_of_int b.opacity /. 100.0)]
+    else [] in
+    let attrs = [
+      attr "stroke-linecap" "round";
+      Printf.sprintf "transform=\"%s\"" (rough_transform b);
+    ] @ (match style with [] -> [] | _ -> [Printf.sprintf " style=\"%s\"" (String.concat ";" style)]) in
+    let stroke_path = void_el "path" [rough_path_attrs b.stroke_color b.raw_stroke_width stroke_d] in
+    if fill_style = "solid" && fill_color b <> "none" then begin
+      let cx = b.width /. 2. in
+      let cy = b.height /. 2. in
+      let fill_shape = void_el "polygon" [
+        attr "points" (Printf.sprintf "%.4g,%.4g %.4g,%.4g %.4g,%.4g %.4g,%.4g"
+          cx 0. (b.width) cy cx (b.height) 0. cy);
+        attr "fill" (fill_color b);
+      ] in
+      mk "g" ~children:[fill_shape; stroke_path] attrs
+    end else if fill_d <> "" then begin
+      let fill_path = void_el "path" [rough_path_attrs (fill_color b) (b.raw_stroke_width /. 2.0) fill_d] in
+      mk "g" ~children:[fill_path; stroke_path] attrs
+    end else
+      mk "g" ~children:[stroke_path] attrs
   | Text el -> render_text_raw el
   | Line el -> render_linear_raw ~is_arrow:false el
   | Arrow el -> render_linear_raw ~is_arrow:true el

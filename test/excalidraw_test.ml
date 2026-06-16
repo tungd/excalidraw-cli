@@ -138,47 +138,47 @@ let test_snapshot_diagram_background_matches_excalidraw () =
     (strip_px (extract_attr "height" actual))
 
 let test_rough_rectangle_deterministic () =
-  let (stroke1, fill1) = Excalidraw_export.Rough.rectangle ~seed:12345 ~roughness:1 ~stroke_width:1.0 ~width:200.0 ~height:100.0 in
-  let (stroke2, fill2) = Excalidraw_export.Rough.rectangle ~seed:12345 ~roughness:1 ~stroke_width:1.0 ~width:200.0 ~height:100.0 in
+  let (stroke1, fill1) = Excalidraw_export.Rough.rectangle ~seed:12345 ~roughness:1 ~stroke_width:1.0 ~width:200.0 ~height:100.0 () in
+  let (stroke2, fill2) = Excalidraw_export.Rough.rectangle ~seed:12345 ~roughness:1 ~stroke_width:1.0 ~width:200.0 ~height:100.0 () in
   Alcotest.(check string) "stroke deterministic" stroke1 stroke2;
   Alcotest.(check string) "fill deterministic" fill1 fill2
 
 let test_rough_ellipse_deterministic () =
-  let (stroke1, fill1) = Excalidraw_export.Rough.ellipse ~seed:99999 ~roughness:1 ~stroke_width:1.0 ~width:200.0 ~height:100.0 in
-  let (stroke2, fill2) = Excalidraw_export.Rough.ellipse ~seed:99999 ~roughness:1 ~stroke_width:1.0 ~width:200.0 ~height:100.0 in
+  let (stroke1, fill1) = Excalidraw_export.Rough.ellipse ~seed:99999 ~roughness:1 ~stroke_width:1.0 ~width:200.0 ~height:100.0 () in
+  let (stroke2, fill2) = Excalidraw_export.Rough.ellipse ~seed:99999 ~roughness:1 ~stroke_width:1.0 ~width:200.0 ~height:100.0 () in
   Alcotest.(check string) "stroke deterministic" stroke1 stroke2;
   Alcotest.(check string) "fill deterministic" fill1 fill2
 
 let test_rough_diamond_deterministic () =
-  let (stroke1, fill1) = Excalidraw_export.Rough.diamond ~seed:42 ~roughness:1 ~stroke_width:1.0 ~width:200.0 ~height:100.0 in
-  let (stroke2, fill2) = Excalidraw_export.Rough.diamond ~seed:42 ~roughness:1 ~stroke_width:1.0 ~width:200.0 ~height:100.0 in
+  let (stroke1, fill1) = Excalidraw_export.Rough.diamond ~seed:42 ~roughness:1 ~stroke_width:1.0 ~width:200.0 ~height:100.0 () in
+  let (stroke2, fill2) = Excalidraw_export.Rough.diamond ~seed:42 ~roughness:1 ~stroke_width:1.0 ~width:200.0 ~height:100.0 () in
   Alcotest.(check string) "stroke deterministic" stroke1 stroke2;
   Alcotest.(check string) "fill deterministic" fill1 fill2
 
 let test_rough_different_seeds_differ () =
-  let (stroke1, _) = Excalidraw_export.Rough.rectangle ~seed:1 ~roughness:1 ~stroke_width:1.0 ~width:200.0 ~height:100.0 in
-  let (stroke2, _) = Excalidraw_export.Rough.rectangle ~seed:2 ~roughness:1 ~stroke_width:1.0 ~width:200.0 ~height:100.0 in
+  let (stroke1, _) = Excalidraw_export.Rough.rectangle ~seed:1 ~roughness:1 ~stroke_width:1.0 ~width:200.0 ~height:100.0 () in
+  let (stroke2, _) = Excalidraw_export.Rough.rectangle ~seed:2 ~roughness:1 ~stroke_width:1.0 ~width:200.0 ~height:100.0 () in
   Alcotest.(check bool) "different seeds produce different paths" true (stroke1 <> stroke2)
 
 let test_rough_rectangle_has_cubic_beziers () =
-  let (stroke, fill) = Excalidraw_export.Rough.rectangle ~seed:1041657908 ~roughness:1 ~stroke_width:1.0 ~width:214.0 ~height:214.0 in
+  let (stroke, fill) = Excalidraw_export.Rough.rectangle ~seed:1041657908 ~roughness:1 ~stroke_width:1.0 ~width:214.0 ~height:214.0 () in
   Alcotest.(check bool) "stroke has C commands" true (String.contains stroke 'C');
   Alcotest.(check bool) "fill has C commands" true (String.contains fill 'C');
   Alcotest.(check bool) "stroke has M commands" true (String.contains stroke 'M');
   Alcotest.(check bool) "fill has M commands" true (String.contains fill 'M')
 
 let test_rough_ellipse_has_cubic_beziers () =
-  let (stroke, fill) = Excalidraw_export.Rough.ellipse ~seed:1041657908 ~roughness:1 ~stroke_width:1.0 ~width:214.0 ~height:214.0 in
+  let (stroke, fill) = Excalidraw_export.Rough.ellipse ~seed:1041657908 ~roughness:1 ~stroke_width:1.0 ~width:214.0 ~height:214.0 () in
   Alcotest.(check bool) "stroke has C commands" true (String.contains stroke 'C');
   Alcotest.(check bool) "fill has C commands" true (String.contains fill 'C')
 
 let test_rough_diamond_has_cubic_beziers () =
-  let (stroke, fill) = Excalidraw_export.Rough.diamond ~seed:1041657908 ~roughness:1 ~stroke_width:1.0 ~width:214.0 ~height:214.0 in
+  let (stroke, fill) = Excalidraw_export.Rough.diamond ~seed:1041657908 ~roughness:1 ~stroke_width:1.0 ~width:214.0 ~height:214.0 () in
   Alcotest.(check bool) "stroke has C commands" true (String.contains stroke 'C');
   Alcotest.(check bool) "fill has C commands" true (String.contains fill 'C')
 
 let test_rough_roughness_0_no_jitter () =
-  let (stroke, _) = Excalidraw_export.Rough.rectangle ~seed:12345 ~roughness:0 ~stroke_width:1.0 ~width:200.0 ~height:100.0 in
+  let (stroke, _) = Excalidraw_export.Rough.rectangle ~seed:12345 ~roughness:0 ~stroke_width:1.0 ~width:200.0 ~height:100.0 () in
   (* With roughness 0, maxRandomnessOffset = 0, so all random offsets should be 0 *)
   (* The path should still have M and C commands but with zero offsets *)
   Alcotest.(check bool) "stroke has M commands" true (String.contains stroke 'M')

@@ -278,18 +278,31 @@ let ops_to_path ops =
 
 let opset_to_path os = ops_to_path os.ops
 
+let cross_hatch_fill polygon_list o =
+  let o1 = { o with hachureAngle = -41.0 } in
+  let pass1 = hachure_fill polygon_list o1 in
+  let o2 = { o with hachureAngle = 49.0 } in
+  let pass2 = hachure_fill polygon_list o2 in
+  pass1 @ pass2
+
 (* --- Public API: shape generators returning (stroke_path, fill_path) --- *)
 
-let rectangle ~seed ~roughness ~stroke_width ~width ~height =
+let rectangle ~seed ~roughness ~stroke_width ~width ~height ?(fill_style="hachure") () =
   let o = default_options ~seed ~roughness:(float roughness) ~stroke_width in
   let stroke_opsets = rectangle_ops 0.0 0.0 width height o in
   let polygon = [(0.0, 0.0); (width, 0.0); (width, height); (0.0, height)] in
-  let fill_opsets = hachure_fill [polygon] o in
+  let fill_d =
+    match fill_style with
+    | "solid" -> ""
+    | "cross-hatch" ->
+      String.concat " " (List.map opset_to_path (cross_hatch_fill [polygon] o))
+    | _ ->
+      String.concat " " (List.map opset_to_path (hachure_fill [polygon] o))
+  in
   let stroke_d = String.concat " " (List.map opset_to_path stroke_opsets) in
-  let fill_d = String.concat " " (List.map opset_to_path fill_opsets) in
   (stroke_d, fill_d)
 
-let ellipse ~seed ~roughness ~stroke_width ~width ~height =
+let ellipse ~seed ~roughness ~stroke_width ~width ~height ?(fill_style="hachure") () =
   let o = default_options ~seed ~roughness:(float roughness) ~stroke_width in
   let cx = width /. 2.0 in
   let cy = height /. 2.0 in
@@ -301,20 +314,32 @@ let ellipse ~seed ~roughness ~stroke_width ~width ~height =
     let angle = float i *. (2.0 *. Float.pi) /. float n in
     (cx +. rx *. cos angle, cy +. ry *. sin angle)
   )) in
-  let fill_opsets = hachure_fill [polygon] o in
+  let fill_d =
+    match fill_style with
+    | "solid" -> ""
+    | "cross-hatch" ->
+      String.concat " " (List.map opset_to_path (cross_hatch_fill [polygon] o))
+    | _ ->
+      String.concat " " (List.map opset_to_path (hachure_fill [polygon] o))
+  in
   let stroke_d = String.concat " " (List.map opset_to_path stroke_opsets) in
-  let fill_d = String.concat " " (List.map opset_to_path fill_opsets) in
   (stroke_d, fill_d)
 
-let diamond ~seed ~roughness ~stroke_width ~width ~height =
+let diamond ~seed ~roughness ~stroke_width ~width ~height ?(fill_style="hachure") () =
   let o = default_options ~seed ~roughness:(float roughness) ~stroke_width in
   let cx = width /. 2.0 in
   let cy = height /. 2.0 in
   let stroke_opsets = diamond_ops 0.0 0.0 width height o in
   let polygon = [(cx, 0.0); (width, cy); (cx, height); (0.0, cy)] in
-  let fill_opsets = hachure_fill [polygon] o in
+  let fill_d =
+    match fill_style with
+    | "solid" -> ""
+    | "cross-hatch" ->
+      String.concat " " (List.map opset_to_path (cross_hatch_fill [polygon] o))
+    | _ ->
+      String.concat " " (List.map opset_to_path (hachure_fill [polygon] o))
+  in
   let stroke_d = String.concat " " (List.map opset_to_path stroke_opsets) in
-  let fill_d = String.concat " " (List.map opset_to_path fill_opsets) in
   (stroke_d, fill_d)
 
 (* --- Line (multi-segment linear element) --- *)
