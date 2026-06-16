@@ -1,0 +1,5 @@
+(library
+ (name excalidraw_server)
+ (public_name excalidraw-export.server)
+ (libraries cohttp-eio eio eio_main yojson excalidraw_export)
+ (modules server editor_static))
